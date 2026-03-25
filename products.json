@@ -1,0 +1,32 @@
+{
+  "products": [
+    {
+      "name": "aspose-font-mcp",
+      "display": "Aspose.Font",
+      "nuget": "Aspose.Font",
+      "slug": "font",
+      "current_version": "23.1.0"
+    },
+    {
+      "name": "aspose-zip-mcp",
+      "display": "Aspose.ZIP",
+      "nuget": "Aspose.ZIP",
+      "slug": "zip",
+      "current_version": "23.1.0"
+    },
+    {
+      "name": "aspose-note-mcp",
+      "display": "Aspose.Note",
+      "nuget": "Aspose.Note",
+      "slug": "note",
+      "current_version": "23.1.0"
+    },
+    {
+      "name": "aspose-pub-mcp",
+      "display": "Aspose.Pub",
+      "nuget": "Aspose.PUB",
+      "slug": "pub",
+      "current_version": "23.1.0"
+    }
+  ]
+}

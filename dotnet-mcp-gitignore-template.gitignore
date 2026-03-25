@@ -1,0 +1,38 @@
+## Build artifacts - never commit these
+bin/
+obj/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider
+.idea/
+
+## Local settings and secrets
+*.local
+.env
+.env.local
+appsettings.local.json
+appsettings.Development.json
+
+## Aspose license files - never commit licenses
+*.lic
+Aspose*.lic
+license.xml
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## Claude Code local settings
+.claude/

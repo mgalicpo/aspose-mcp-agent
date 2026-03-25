@@ -1,0 +1,41 @@
+name: Check Aspose NuGet Versions
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 08:00 UTC
+  workflow_dispatch:       # Manual trigger - use this for testing
+
+permissions:
+  contents: write   # needed to commit updated products.json
+  issues: write     # needed to create issues
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check NuGet versions
+        id: check
+        run: python scripts/check_nuget.py
+
+      - name: Create GitHub Issue if updates found
+        if: steps.check.outputs.updates_found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "Aspose NuGet updates: ${{ steps.check.outputs.update_count }} package(s)" \
+            --body "${{ steps.check.outputs.issue_body }}" \
+            --label "aspose-update"
+
+      - name: Commit updated products.json
+        if: steps.check.outputs.updates_found == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add products.json
+          git commit -m "chore: update known NuGet versions [skip ci]"
+          git push
