@@ -30,7 +30,7 @@ def build_issue_body(updates: list) -> str:
     lines = ["## Aspose NuGet Updates Detected\n"]
     for u in updates:
         lines.append(f"### {u['display']}")
-        lines.append(f"- Version: `{u['current']}` -> `{u['latest']}`")
+        lines.append(f"- Version: **{u['current']}** -> **{u['latest']}**")
         lines.append(f"- Release notes: https://releases.aspose.com/{u['slug']}/net/")
         lines.append(f"- NuGet: https://www.nuget.org/packages/{u['nuget']}/")
         lines.append("")

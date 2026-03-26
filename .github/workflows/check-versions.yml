@@ -25,10 +25,12 @@ jobs:
         if: steps.check.outputs.updates_found == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_BODY: ${{ steps.check.outputs.issue_body }}
         run: |
+          echo "$ISSUE_BODY" > /tmp/issue_body.md
           gh issue create \
             --title "Aspose NuGet updates: ${{ steps.check.outputs.update_count }} package(s)" \
-            --body "${{ steps.check.outputs.issue_body }}" \
+            --body-file /tmp/issue_body.md \
             --label "aspose-update"
 
       - name: Commit updated products.json
