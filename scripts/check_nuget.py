@@ -9,6 +9,10 @@ import os
 import urllib.request
 import urllib.error
 
+# Always resolve paths relative to repo root, not cwd
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PRODUCTS_FILE = os.path.join(REPO_ROOT, "products.json")
+
 
 def get_latest_stable(package_id: str) -> str:
     url = f"https://api.nuget.org/v3-flatcontainer/{package_id.lower()}/index.json"
@@ -39,7 +43,7 @@ def build_issue_body(updates: list) -> str:
 
 
 def main():
-    with open("products.json") as f:
+    with open(PRODUCTS_FILE) as f:
         config = json.load(f)
 
     updates = []
@@ -51,12 +55,13 @@ def main():
         if latest != current:
             print(f"  UPDATE: {current} -> {latest}")
             updates.append({**product, "current": current, "latest": latest})
+            product["previous_version"] = current  # remember what we had before
             product["current_version"] = latest
         else:
             print(f"  OK: {current}")
 
     # Save updated versions back to products.json
-    with open("products.json", "w") as f:
+    with open(PRODUCTS_FILE, "w") as f:
         json.dump(config, f, indent=2)
 
     # Write to GitHub Actions output
