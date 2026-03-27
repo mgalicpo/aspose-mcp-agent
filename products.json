@@ -5,6 +5,7 @@
       "display": "Aspose.Font",
       "nuget": "Aspose.Font",
       "slug": "font",
+      "github_repo": "mgalicpo/aspose-font-mcp",
       "current_version": "26.2.0"
     },
     {
@@ -12,6 +13,7 @@
       "display": "Aspose.ZIP",
       "nuget": "Aspose.ZIP",
       "slug": "zip",
+      "github_repo": "mgalicpo/aspose-zip-mcp",
       "current_version": "26.2.0"
     },
     {
@@ -19,6 +21,7 @@
       "display": "Aspose.Note",
       "nuget": "Aspose.Note",
       "slug": "note",
+      "github_repo": "mgalicpo/aspose-note-mcp",
       "current_version": "26.3.0",
       "previous_version": "25.12.0"
     },
@@ -27,6 +30,7 @@
       "display": "Aspose.Pub",
       "nuget": "Aspose.PUB",
       "slug": "pub",
+      "github_repo": "mgalicpo/aspose-pub-mcp",
       "current_version": "25.12.0"
     }
   ]

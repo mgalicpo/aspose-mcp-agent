@@ -87,8 +87,9 @@ def fetch_release_notes(slug: str, version: str) -> tuple[str, str]:
 
 # ── tool-map.md from GitHub ───────────────────────────────────────────────────
 
-def fetch_tool_map(github_user: str, repo_name: str) -> str | None:
-    url = f"https://raw.githubusercontent.com/{github_user}/{repo_name}/main/tool-map.md"
+def fetch_tool_map(github_repo: str) -> str | None:
+    """Fetch tool-map.md using full repo path, e.g. 'mgalicpo/aspose-zip-mcp'."""
+    url = f"https://raw.githubusercontent.com/{github_repo}/main/tool-map.md"
     try:
         return _fetch(url)
     except Exception:
@@ -147,7 +148,8 @@ def main():
     parser.add_argument("--product", help="Product slug (zip, font, note, pub). Default: all pending.")
     parser.add_argument("--from", dest="from_version", help="Old version (overrides products.json)")
     parser.add_argument("--to",   dest="to_version",   help="New version (overrides products.json)")
-    parser.add_argument("--github-user", default="mgalicpo", help="GitHub username")
+    parser.add_argument("--github-user", default=None,
+                        help="Fallback GitHub username if github_repo not set in products.json")
     args = parser.parse_args()
 
     with open(PRODUCTS_FILE) as f:
@@ -183,8 +185,14 @@ def main():
         print(f"  Source: {notes_url}")
 
         print("Fetching tool-map.md from GitHub...", flush=True)
-        tool_map = fetch_tool_map(args.github_user, product["name"])
-        print(f"  {'Found' if tool_map else 'Not found (continuing without it)'}")
+        github_repo = product.get("github_repo") or (
+            f"{args.github_user}/{product['name']}" if args.github_user else None
+        )
+        tool_map = fetch_tool_map(github_repo) if github_repo else None
+        if not github_repo:
+            print("  Skipped (no github_repo in products.json and no --github-user given)")
+        else:
+            print(f"  {'Found' if tool_map else f'Not found at {github_repo}'}")
 
         print("Asking Claude...\n", flush=True)
         result = analyze(product, from_v, to_v, notes, notes_url, tool_map)
