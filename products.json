@@ -14,7 +14,8 @@
       "nuget": "Aspose.ZIP",
       "slug": "zip",
       "github_repo": "mgalicpo/aspose-zip-mcp",
-      "current_version": "26.2.0"
+      "current_version": "26.3.0",
+      "previous_version": "26.2.0"
     },
     {
       "name": "aspose-note-mcp",
