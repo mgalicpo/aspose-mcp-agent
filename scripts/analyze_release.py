@@ -141,6 +141,40 @@ Answer these 4 questions concisely:
     return msg.content[0].text
 
 
+# ── Prepare context for manual Claude Code analysis ──────────────────────────
+
+def _print_context_for_claude(product, from_v, to_v, notes, notes_url, tool_map):
+    tool_map_block = (
+        f"Current tool-map.md:\n---\n{tool_map}\n---"
+        if tool_map
+        else "tool-map.md: not available"
+    )
+    print(f"""
+{'#'*60}
+# PASTE THIS INTO CLAUDE CODE
+{'#'*60}
+
+Analiziraj ovu Aspose promjenu i reci mi:
+1. SAFE TO MERGE? Mogu li mergeat Dependabot PR bez izmjena u MCP server kodu?
+2. NOVI TOOLOVI? Postoje li nove API metode koje bi trebale postati novi MCP toolovi?
+3. BREAKING CHANGES? Jesu li postojeći toolovi zahvaćeni promjenama?
+4. SLJEDECI KORAK? Jedna konkretna rečenica što trebam napraviti.
+
+Produkt: {product['display']}
+Verzija: {from_v} -> {to_v}
+Release notes: {notes_url}
+
+Release notes:
+---
+{notes}
+---
+
+{tool_map_block}
+
+{'#'*60}
+""")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -150,6 +184,8 @@ def main():
     parser.add_argument("--to",   dest="to_version",   help="New version (overrides products.json)")
     parser.add_argument("--github-user", default=None,
                         help="Fallback GitHub username if github_repo not set in products.json")
+    parser.add_argument("--prepare", action="store_true",
+                        help="Only fetch and print context (no Claude API call). Paste output into Claude Code.")
     args = parser.parse_args()
 
     with open(PRODUCTS_FILE) as f:
@@ -194,9 +230,12 @@ def main():
         else:
             print(f"  {'Found' if tool_map else f'Not found at {github_repo}'}")
 
-        print("Asking Claude...\n", flush=True)
-        result = analyze(product, from_v, to_v, notes, notes_url, tool_map)
-        print(result)
+        if args.prepare:
+            _print_context_for_claude(product, from_v, to_v, notes, notes_url, tool_map)
+        else:
+            print("Asking Claude...\n", flush=True)
+            result = analyze(product, from_v, to_v, notes, notes_url, tool_map)
+            print(result)
 
         analyzed_any = True
 
