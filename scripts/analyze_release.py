@@ -59,30 +59,43 @@ def _fetch(url: str) -> str:
 
 # ── Release notes ─────────────────────────────────────────────────────────────
 
-def _release_notes_url(slug: str, version: str) -> str:
+def _candidate_urls(slug: str, version: str) -> list[str]:
     """
-    Constructs Aspose release notes URL.
-    Aspose uses YY.M.patch versioning, e.g. 26.3.0 = year 2026, month 3.
-    URL pattern: https://releases.aspose.com/{slug}/net/release-notes/{year}/aspose-{slug}-for-net-{major}-{minor}-release-notes/
+    Generate candidate release notes URLs to try in order.
+    Aspose uses YY.M.patch versioning: 26.3.0 = year 2026, month 3.
+    URL formats vary slightly across products — try all common patterns.
     """
-    major, minor = version.split(".")[:2]
+    major, minor, patch = (version.split(".") + ["0"])[:3]
     year = f"20{major}"
-    return (
-        f"https://releases.aspose.com/{slug}/net/release-notes/"
-        f"{year}/aspose-{slug}-for-net-{major}-{minor}-release-notes/"
-    )
+    base = f"https://releases.aspose.com/{slug}/net/release-notes/{year}"
+    return [
+        f"{base}/aspose-{slug}-for-net-{major}-{minor}-{patch}-release-notes/",
+        f"{base}/aspose-{slug}-for-net-{major}-{minor}-release-notes/",
+        f"{base}/aspose-{slug}-for-net-{major}-{minor}-0-release-notes/",
+    ]
 
 
 def fetch_release_notes(slug: str, version: str) -> tuple[str, str]:
-    """Returns (text, url). Falls back to main releases page if specific URL fails."""
-    url = _release_notes_url(slug, version)
-    try:
-        text = _html_to_text(_fetch(url))
-        return text[:5000], url  # cap to avoid token overload
-    except Exception:
-        fallback = f"https://releases.aspose.com/{slug}/net/"
-        text = _html_to_text(_fetch(fallback))
-        return text[:3000], fallback
+    """Returns (text, url). Tries multiple URL patterns before falling back."""
+    major = version.split(".")[0]
+    for url in _candidate_urls(slug, version):
+        try:
+            text = _html_to_text(_fetch(url))
+            if major in text:  # sanity check: page actually mentions the version
+                return text[:5000], url
+        except Exception:
+            continue
+
+    # Release notes not published yet for this version
+    major = version.split(".")[0]
+    year = f"20{major}"
+    fallback = f"https://releases.aspose.com/{slug}/net/release-notes/"
+    msg = (
+        f"Release notes for {slug} {version} not yet published on releases.aspose.com.\n"
+        f"Check manually: {fallback}{year}/ once Aspose publishes them.\n"
+        f"Recommendation: bump the NuGet version, run CI, and merge if tests pass."
+    )
+    return msg, fallback
 
 
 # ── tool-map.md from GitHub ───────────────────────────────────────────────────
@@ -126,7 +139,7 @@ Release notes (excerpt):
 
 Answer these 4 questions concisely:
 
-1. SAFE TO MERGE? Can the Dependabot PR be merged without touching MCP server code?
+1. SAFE TO MERGE? Can the Dependabot PR be merged without any MCP server code changes?
 2. NEW TOOLS? List any new Aspose APIs/capabilities that should become new MCP tools (name + one-line description each).
 3. BREAKING CHANGES? Any existing MCP tools affected by API changes or deprecations?
 4. NEXT STEP? One concrete sentence: what should the developer do right now.
@@ -154,15 +167,15 @@ def _print_context_for_claude(product, from_v, to_v, notes, notes_url, tool_map)
 # PASTE THIS INTO CLAUDE CODE
 {'#'*60}
 
-Analiziraj ovu Aspose promjenu i reci mi:
-1. SAFE TO MERGE? Mogu li mergeat Dependabot PR bez izmjena u MCP server kodu?
-2. NOVI TOOLOVI? Postoje li nove API metode koje bi trebale postati novi MCP toolovi?
-3. BREAKING CHANGES? Jesu li postojeći toolovi zahvaćeni promjenama?
-4. SLJEDECI KORAK? Jedna konkretna rečenica što trebam napraviti.
+Analyze this Aspose library update and answer:
+1. SAFE TO MERGE? Can I merge the Dependabot PR without any MCP server code changes?
+2. NEW TOOLS? Are there new API methods/capabilities that should become new MCP tools?
+3. BREAKING CHANGES? Are any existing MCP tools affected by API changes or deprecations?
+4. NEXT STEP? One concrete sentence: what should I do right now.
 
-Produkt: {product['display']}
-Verzija: {from_v} -> {to_v}
-Release notes: {notes_url}
+Product: {product['display']}
+Version: {from_v} -> {to_v}
+Release notes source: {notes_url}
 
 Release notes:
 ---
