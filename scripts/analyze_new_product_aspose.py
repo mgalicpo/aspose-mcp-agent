@@ -158,6 +158,25 @@ def _llm_call(token: str, model: str, prompt: str) -> str:
     return data["choices"][0]["message"]["content"]
 
 
+def _llm_call_with_retry(token: str, model: str, prompt: str,
+                         max_attempts: int = 3) -> str:
+    """
+    Network-level retry: transparently retries on timeout/HTTP errors.
+    Does NOT modify the prompt — these are transient failures, not semantic ones.
+    """
+    last_error = None
+    for attempt in range(max_attempts):
+        try:
+            return _llm_call(token, model, prompt)
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as e:
+            last_error = str(e)
+            print(f"  [network retry {attempt+1}/{max_attempts}] {last_error}")
+        except Exception as e:
+            last_error = str(e)
+            print(f"  [network retry {attempt+1}/{max_attempts}] {last_error}")
+    raise RuntimeError(f"LLM unreachable after {max_attempts} attempts: {last_error}")
+
+
 def _parse_json(raw: str) -> dict:
     raw = raw.strip()
     if raw.startswith("```"):
@@ -189,12 +208,17 @@ def analyze_with_react(token: str, model: str, slug: str, nuget: str,
     current_prompt = base_prompt
 
     for iteration in range(MAX_REACT_ITERATIONS):
-        # ACT
+        # ACT — network errors retried transparently, not fed to LLM
         try:
-            raw = _llm_call(token, model, current_prompt)
+            raw = _llm_call_with_retry(token, model, current_prompt)
+        except RuntimeError as e:
+            raise  # network completely unreachable, give up
+
+        # Parse JSON — semantic error, feed back as OBSERVE
+        try:
             result = _parse_json(raw)
-        except (json.JSONDecodeError, Exception) as e:
-            msg = f"Invalid JSON: {e}"
+        except json.JSONDecodeError as e:
+            msg = f"Response was not valid JSON: {e}"
             print(f"  [ReAct {iteration+1}/{MAX_REACT_ITERATIONS}] {msg}")
             current_prompt = base_prompt + f"\n\nOBSERVE: {msg}. Return ONLY valid JSON."
             continue
