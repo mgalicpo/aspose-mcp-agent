@@ -17,28 +17,36 @@ All repos are **private**. Canonical version state is tracked in `products.json`
 
 ## Scripts
 
+### Existing product — version updates
 | Script | What it does |
 |---|---|
 | `scripts/check_nuget.py` | Polls NuGet API for new versions, updates `products.json`, creates GitHub Issue |
-| `scripts/analyze_release.py` | Fetches Aspose release notes + `tool-map.md`, asks Claude API for analysis |
-| `scripts/analyze_release_aspose.py` | Same as above but uses Aspose LLM gateway (`ASPOSE_LLM_TOKEN` from `.env`) |
-| `scripts/merge_dependabot.py` | Lists open Dependabot PRs across all repos, asks Claude if safe to merge |
-| `scripts/merge_dependabot_aspose.py` | Same but uses Aspose LLM gateway |
-| `scripts/upgrade_product.py` | Updates `.csproj` version locally, runs `dotnet build` + `dotnet test`, commits and pushes |
+| `scripts/analyze_release_aspose.py` | Fetches release notes + `tool-map.md`, ReAct LLM analysis, confidence scoring |
+| `scripts/analyze_release.py` | Same but uses Anthropic API (`--prepare` for no-key mode) |
+| `scripts/merge_dependabot_aspose.py` | Lists Dependabot PRs, asks LLM if safe to merge, optionally merges |
+| `scripts/merge_dependabot.py` | Same but uses Anthropic API |
+| `scripts/upgrade_product.py` | Bumps `.csproj`, `dotnet build` + `dotnet test`, commits and pushes |
 
-## Typical Workflow
+### New product — onboarding
+| Script | What it does |
+|---|---|
+| `scripts/analyze_new_product_aspose.py` | Fetches Aspose docs, generates tool-map.md via Aspose LLM |
+| `scripts/analyze_new_product.py` | Same but uses Anthropic API (`--prepare` for no-key mode) |
+| `scripts/new_product.py` | Scaffolds full C# project, creates GitHub repo, registers in `products.json` |
 
+## Typical Workflows
+
+**Version update:**
 ```
-check_nuget.py               ← detects new NuGet versions, saves to products.json
-        ↓
-analyze_release_aspose.py    ← fetches release notes, asks LLM: safe to merge? new tools?
-        ↓
- [no new features]           [new features needed]
-        ↓                            ↓
-upgrade_product.py           upgrade_product.py + implement new MCP tools manually
+check_nuget.py → analyze_release_aspose.py → upgrade_product.py
 ```
 
-`check_nuget.py` runs automatically every Monday via GitHub Actions (`.github/workflows/check-versions.yml`) and opens a GitHub Issue when updates are found.
+**New product:**
+```
+analyze_new_product_aspose.py → new_product.py → implement tools in Claude Code
+```
+
+`check_nuget.py` runs automatically every Monday via GitHub Actions and opens a GitHub Issue when updates are found.
 
 ## Key Files
 

@@ -5,6 +5,8 @@ Detects new NuGet releases, analyzes them with an LLM, and upgrades local repos.
 
 ## Architecture
 
+### Existing product — version update flow
+
 ```
                         ┌─────────────────────────────────────────────┐
                         │              GitHub Actions (weekly)         │
@@ -37,11 +39,34 @@ Detects new NuGet releases, analyzes them with an LLM, and upgrades local repos.
           ┌──────┴──────┐       (manual review)
          YES             NO
           │               │
-   upgrade_product.py   implement
-   (bump .csproj,        new MCP tools
-    dotnet build,        manually
+   upgrade_product.py   implement new MCP tools
+   (bump .csproj,        then upgrade_product.py
+    dotnet build,
     dotnet test,
     git push)
+```
+
+### New product — onboarding flow
+
+```
+   analyze_new_product_aspose.py
+   (fetches Aspose docs, LLM designs tool map)
+                  │
+                  ▼
+            tool-map.md
+                  │
+                  ▼
+        new_product.py
+        (scaffold project, create GitHub repo,
+         register in products.json)
+                  │
+                  ▼
+        implement tools in Claude Code
+        (using tool-map.md as spec)
+                  │
+                  ▼
+        version tracking starts automatically
+        (check_nuget.py picks it up next Monday)
 ```
 
 ## State Model
@@ -72,28 +97,46 @@ previous_version ≠ current_version   ← PENDING analysis
 ## Quick Start
 
 ```bash
-# 1. Copy and fill in credentials
-cp .env.example .env
+# Setup
+cp .env.example .env   # fill in ASPOSE_LLM_TOKEN
 
-# 2. Check for new NuGet versions
-python scripts/check_nuget.py
+# ── Existing product: version update ──────────────────────────────
+python scripts/check_nuget.py                          # detect new versions
+python scripts/analyze_release_aspose.py               # analyze what changed
+python scripts/upgrade_product.py \
+    --repos-dir D:\GIT\FinishedMCPservers               # build, test, push
 
-# 3. Analyze what changed (ReAct + confidence scoring)
-python scripts/analyze_release_aspose.py
+# ── New product: onboarding ────────────────────────────────────────
+python scripts/analyze_new_product_aspose.py \
+    --slug words --nuget "Aspose.Words" \
+    --output tool-map.md                               # generate tool map
 
-# 4. Upgrade, build, test, push
-python scripts/upgrade_product.py --repos-dir D:\GIT\FinishedMCPservers
+python scripts/new_product.py \
+    --slug words --nuget "Aspose.Words" --version "25.1.0" \
+    --output-dir D:\GIT\FinishedMCPservers \
+    --github-user mgalicpo --create-repo               # scaffold + push
 ```
 
 ## Scripts
 
+### Existing product — version updates
+
 | Script | Purpose |
 |---|---|
 | `check_nuget.py` | Poll NuGet API, update `products.json`, create GitHub Issue |
-| `analyze_release_aspose.py` | Fetch release notes, ReAct LLM analysis, confidence scoring |
+| `analyze_release_aspose.py` | Fetch release notes, ReAct LLM analysis + confidence scoring |
 | `analyze_release.py` | Same, using Anthropic API (`--prepare` for no-key mode) |
 | `merge_dependabot_aspose.py` | Find Dependabot PRs, LLM safe/unsafe decision, optional auto-merge |
+| `merge_dependabot.py` | Same, using Anthropic API |
 | `upgrade_product.py` | Bump `.csproj`, `dotnet build`, `dotnet test`, commit, push |
+
+### New product — onboarding
+
+| Script | Purpose |
+|---|---|
+| `analyze_new_product_aspose.py` | Fetch Aspose docs, generate tool-map.md via Aspose LLM (ReAct + network retry) |
+| `analyze_new_product.py` | Same, using Anthropic API (`--prepare` for no-key mode) |
+| `new_product.py` | Scaffold full project structure, create GitHub repo, register in `products.json` |
 
 ## Configuration
 
@@ -113,18 +156,22 @@ python scripts/upgrade_product.py --repos-dir D:\GIT\FinishedMCPservers
 
 ## Adding a New Product
 
-1. Add entry to `products.json`:
-```json
-{
-  "name": "aspose-words-mcp",
-  "display": "Aspose.Words",
-  "nuget": "Aspose.Words",
-  "slug": "words",
-  "github_repo": "mgalicpo/aspose-words-mcp",
-  "current_version": "25.1.0"
-}
+```bash
+# Step 1 — generate tool map from Aspose docs
+python scripts/analyze_new_product_aspose.py \
+    --slug words --nuget "Aspose.Words" --output tool-map.md
+
+# Step 2 — scaffold project, create GitHub repo, register in products.json
+python scripts/new_product.py \
+    --slug words --nuget "Aspose.Words" --version "25.1.0" \
+    --output-dir D:\GIT\FinishedMCPservers \
+    --github-user mgalicpo --create-repo
+
+# Step 3 — implement tools in Claude Code (use tool-map.md as spec)
+# Step 4 — version tracking starts automatically next Monday
 ```
-2. Run `check_nuget.py` — future updates are tracked automatically.
+
+See `docs/new-product-analysis-template.md` for the full analysis guide.
 
 ## CI
 
