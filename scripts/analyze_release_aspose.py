@@ -232,6 +232,7 @@ Respond with ONLY valid JSON — no prose, no markdown fences:
 {{
   "safe_to_merge": true or false,
   "reason": "one sentence explaining the safe_to_merge decision",
+  "confidence": 0.0 to 1.0,
   "new_tools": [
     {{"name": "tool_name", "api_class": "ExactCSharpClassName", "description": "one-line description"}}
   ],
@@ -240,6 +241,7 @@ Respond with ONLY valid JSON — no prose, no markdown fences:
 }}
 
 Rules:
+- confidence: your certainty in the safe_to_merge decision. Use < 0.7 when release notes are missing, incomplete, or ambiguous.
 - new_tools: only APIs explicitly listed in the release notes above. "api_class" must be the exact C# class name as written in the release notes.
 - If no new tools, use: "new_tools": []
 - If no breaking changes, use: "breaking_changes": []
@@ -257,6 +259,8 @@ def _parse_json_response(raw: str) -> dict:
     return json.loads(raw.strip())
 
 
+CONFIDENCE_THRESHOLD = 0.7
+
 def _validate_schema(decision: dict):
     """Raise ValueError if required fields are missing or wrong type."""
     if not isinstance(decision.get("safe_to_merge"), bool):
@@ -268,6 +272,9 @@ def _validate_schema(decision: dict):
         raise ValueError("'new_tools' must be an array")
     if not isinstance(decision.get("breaking_changes"), list):
         raise ValueError("'breaking_changes' must be an array")
+    confidence = decision.get("confidence")
+    if confidence is not None and not isinstance(confidence, (int, float)):
+        raise ValueError(f"'confidence' must be a number, got: {confidence!r}")
 
 
 def _version_exists_on_nuget(nuget: str, version: str) -> bool:
@@ -314,10 +321,10 @@ def _validate_analysis(decision: dict, to_version: str, nuget: str,
 
 def analyze_with_react(token: str, model: str, product: dict, from_version: str,
                        to_version: str, release_notes: str, notes_url: str,
-                       tool_map: str | None) -> dict:
+                       tool_map: str | None) -> tuple[dict, int]:
     """
     ReAct loop: ACT (LLM call) → OBSERVE (validate claims) → feed failures back.
-    Iterates up to MAX_REACT_ITERATIONS times.
+    Returns (decision, iterations_used).
     """
     base_prompt = _build_prompt(product, from_version, to_version,
                                 release_notes, notes_url, tool_map)
@@ -344,7 +351,7 @@ def analyze_with_react(token: str, model: str, product: dict, from_version: str,
         if not failures:
             if iteration > 0:
                 print(f"  [ReAct] Validation passed on iteration {iteration + 1}.")
-            return decision
+            return decision, iteration + 1
 
         failures_text = "\n".join(f"  - {f}" for f in failures)
         print(f"  [ReAct {iteration + 1}/{MAX_REACT_ITERATIONS}] "
@@ -356,14 +363,37 @@ def analyze_with_react(token: str, model: str, product: dict, from_version: str,
         )
 
     print(f"  [ReAct] Returning best-effort result after {MAX_REACT_ITERATIONS} iterations.")
-    return decision
+    return decision, MAX_REACT_ITERATIONS
+
+
+def _check_escalation(decision: dict, react_iterations: int) -> list[str]:
+    """
+    Returns escalation warnings if confidence is low or ReAct didn't converge.
+    These are surfaced to the developer — not fed back to the model.
+    """
+    warnings = []
+    confidence = decision.get("confidence")
+    if confidence is not None and confidence < CONFIDENCE_THRESHOLD:
+        warnings.append(
+            f"Low confidence ({confidence:.2f} < {CONFIDENCE_THRESHOLD}). "
+            f"Release notes may be missing or ambiguous — recommend manual review before merging."
+        )
+    if react_iterations >= MAX_REACT_ITERATIONS:
+        warnings.append(
+            f"ReAct did not converge after {MAX_REACT_ITERATIONS} iterations. "
+            f"Result is best-effort — recommend manual verification."
+        )
+    return warnings
 
 
 # ── Output formatting ─────────────────────────────────────────────────────────
 
-def _print_result(decision: dict):
+def _print_result(decision: dict, escalation_warnings: list[str]):
     safe = decision.get("safe_to_merge", False)
-    print(f"1. SAFE TO MERGE: {'YES' if safe else 'NO'}")
+    confidence = decision.get("confidence")
+    conf_str = f"  [confidence: {confidence:.2f}]" if confidence is not None else ""
+
+    print(f"1. SAFE TO MERGE: {'YES' if safe else 'NO'}{conf_str}")
     print(f"   {decision.get('reason', '')}")
 
     new_tools = decision.get("new_tools") or []
@@ -378,6 +408,13 @@ def _print_result(decision: dict):
 
     print(f"\n4. NEXT STEP:")
     print(f"   {decision.get('next_step', '')}")
+
+    if escalation_warnings:
+        print(f"\n{'!'*60}")
+        print("  ESCALATION — manual review recommended:")
+        for w in escalation_warnings:
+            print(f"  ! {w}")
+        print(f"{'!'*60}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -445,9 +482,11 @@ def main():
 
         print(f"Asking {args.model} (ReAct validation enabled)...\n", flush=True)
         try:
-            decision = analyze_with_react(token, args.model, product, from_v, to_v,
-                                          notes, notes_url, tool_map)
-            _print_result(decision)
+            decision, iterations = analyze_with_react(token, args.model, product,
+                                                      from_v, to_v, notes,
+                                                      notes_url, tool_map)
+            warnings = _check_escalation(decision, iterations)
+            _print_result(decision, warnings)
         except RuntimeError as e:
             print(f"ERROR: {e}")
 
