@@ -12,6 +12,9 @@ Thumbs.db
 
 ## Secrets
 .env
+*.db
+*.sqlite
+data/
 
 ## Local backups
 bkp/
