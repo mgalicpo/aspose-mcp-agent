@@ -1,22 +1,51 @@
 #!/usr/bin/env python3
 """
-Fetches Aspose release notes for a new version and uses Claude to analyze
-whether the MCP server needs new tools or changes to existing ones.
+[ASPOSE LLM] Release analysis using the Aspose/Professionalize LLM gateway.
+Equivalent to analyze_release.py but uses llm.professionalize.com instead
+of the Anthropic API. Requires ASPOSE_LLM_TOKEN env var.
+
+Gateway docs: see CLAUDE.md
+Models: recommended (default), experimental, qwen3-next, gpt-oss
 
 Usage:
-  python scripts/analyze_release.py                    # analyze all pending updates
-  python scripts/analyze_release.py --product zip      # specific product
-  python scripts/analyze_release.py --product zip --from 26.2.0 --to 26.3.0  # explicit versions
+  python scripts/analyze_release_aspose.py                      # all pending
+  python scripts/analyze_release_aspose.py --product zip        # specific product
+  python scripts/analyze_release_aspose.py --model experimental # coding model
+  python scripts/analyze_release_aspose.py --product zip --from 26.3.0 --to 26.4.0
 """
 import argparse
 import json
 import os
+import sys
 import urllib.request
 import urllib.error
+
+# Windows consoles default to cp1250 which can't handle many Unicode chars
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from html.parser import HTMLParser
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRODUCTS_FILE = os.path.join(REPO_ROOT, "products.json")
+
+ASPOSE_LLM_BASE = "https://llm.professionalize.com"
+
+
+def _load_env():
+    """Load .env from repo root into os.environ (only if key not already set)."""
+    env_file = os.path.join(REPO_ROOT, ".env")
+    if not os.path.exists(env_file):
+        return
+    with open(env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                if key.strip() not in os.environ:
+                    os.environ[key.strip()] = value.strip()
+
+_load_env()
+DEFAULT_MODEL = "recommended"
 
 
 # ── HTML → plain text ────────────────────────────────────────────────────────
@@ -60,11 +89,6 @@ def _fetch(url: str) -> str:
 # ── Release notes ─────────────────────────────────────────────────────────────
 
 def _candidate_urls(slug: str, version: str) -> list[str]:
-    """
-    Generate candidate release notes URLs to try in order.
-    Aspose uses YY.M.patch versioning: 26.3.0 = year 2026, month 3.
-    URL formats vary slightly across products — try all common patterns.
-    """
     major, minor, patch = (version.split(".") + ["0"])[:3]
     year = f"20{major}"
     base = f"https://releases.aspose.com/{slug}/net/release-notes/{year}"
@@ -76,18 +100,15 @@ def _candidate_urls(slug: str, version: str) -> list[str]:
 
 
 def fetch_release_notes(slug: str, version: str) -> tuple[str, str]:
-    """Returns (text, url). Tries multiple URL patterns before falling back."""
     major = version.split(".")[0]
     for url in _candidate_urls(slug, version):
         try:
             text = _html_to_text(_fetch(url))
-            if major in text:  # sanity check: page actually mentions the version
+            if major in text:
                 return text[:5000], url
         except Exception:
             continue
 
-    # Release notes not published yet for this version
-    major = version.split(".")[0]
     year = f"20{major}"
     fallback = f"https://releases.aspose.com/{slug}/net/release-notes/"
     msg = (
@@ -98,10 +119,7 @@ def fetch_release_notes(slug: str, version: str) -> tuple[str, str]:
     return msg, fallback
 
 
-# ── tool-map.md from GitHub ───────────────────────────────────────────────────
-
 def _gh_token() -> str | None:
-    """Get GitHub token via gh CLI (works for private repos)."""
     import subprocess
     try:
         result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=5)
@@ -113,14 +131,12 @@ def _gh_token() -> str | None:
 
 def fetch_tool_map(github_repo: str) -> str | None:
     """Fetch tool-map.md. Tries raw URL first, then GitHub API with gh token (for private repos)."""
-    # Try unauthenticated raw URL first (works for public repos)
     raw_url = f"https://raw.githubusercontent.com/{github_repo}/main/tool-map.md"
     try:
         return _fetch(raw_url)
     except Exception:
         pass
 
-    # Fall back to GitHub Contents API with gh CLI token (works for private repos)
     token = _gh_token()
     if not token:
         return None
@@ -136,22 +152,65 @@ def fetch_tool_map(github_repo: str) -> str | None:
         return None
 
 
-# ── Claude analysis ───────────────────────────────────────────────────────────
+# ── Aspose LLM call (OpenAI-compatible) ──────────────────────────────────────
 
-def analyze(product: dict, from_version: str, to_version: str,
-            release_notes: str, notes_url: str, tool_map: str | None) -> str:
-    try:
-        import anthropic
-    except ImportError:
-        return "ERROR: Run `pip install anthropic` first."
+def _llm_call(token: str, model: str, prompt: str) -> str:
+    """Single call to the Aspose LLM gateway (/v1/chat/completions)."""
+    url = f"{ASPOSE_LLM_BASE}/v1/chat/completions"
+    payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1024,
+    }).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.loads(r.read())
+    return data["choices"][0]["message"]["content"]
 
+
+def _llm_call_with_retry(token: str, model: str, prompt: str,
+                         max_attempts: int = 3) -> str:
+    """
+    Guardrail: retry up to max_attempts times, feeding the error back to the
+    model on each retry (as recommended in CLAUDE.md for mid-tier models).
+    """
+    last_error = None
+    for attempt in range(max_attempts):
+        user_prompt = prompt if attempt == 0 else (
+            f"{prompt}\n\n"
+            f"[Previous attempt failed: {last_error}. "
+            f"Please provide a complete, well-structured answer.]"
+        )
+        try:
+            return _llm_call(token, model, user_prompt)
+        except urllib.error.HTTPError as e:
+            last_error = f"HTTP {e.code}: {e.reason}"
+        except Exception as e:
+            last_error = str(e)
+        print(f"  [retry {attempt + 1}/{max_attempts}] Error: {last_error}")
+
+    raise RuntimeError(
+        f"[ASPOSE LLM] Failed after {max_attempts} attempts. Last error: {last_error}"
+    )
+
+
+# ── Analysis ──────────────────────────────────────────────────────────────────
+
+def _build_prompt(product: dict, from_version: str, to_version: str,
+                  release_notes: str, notes_url: str, tool_map: str | None) -> str:
     tool_map_block = (
         f"Current tool-map.md:\n---\n{tool_map}\n---"
         if tool_map
         else "tool-map.md not available (repo not published yet)."
     )
-
-    prompt = f"""You are reviewing an Aspose .NET library update to decide if an MCP server needs changes.
+    return f"""You are reviewing an Aspose .NET library update to decide if an MCP server needs changes.
 
 Product: {product['display']}
 Version: {from_version} -> {to_version}
@@ -172,61 +231,37 @@ Answer these 4 questions concisely:
 4. NEXT STEP? One concrete sentence: what should the developer do right now.
 """
 
-    client = anthropic.Anthropic()
-    msg = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return msg.content[0].text
 
-
-# ── Prepare context for manual Claude Code analysis ──────────────────────────
-
-def _print_context_for_claude(product, from_v, to_v, notes, notes_url, tool_map):
-    tool_map_block = (
-        f"Current tool-map.md:\n---\n{tool_map}\n---"
-        if tool_map
-        else "tool-map.md: not available"
-    )
-    print(f"""
-{'#'*60}
-# PASTE THIS INTO CLAUDE CODE
-{'#'*60}
-
-Analyze this Aspose library update and answer:
-1. SAFE TO MERGE? Can I merge the Dependabot PR without any MCP server code changes?
-2. NEW TOOLS? Are there new API methods/capabilities that should become new MCP tools?
-3. BREAKING CHANGES? Are any existing MCP tools affected by API changes or deprecations?
-4. NEXT STEP? One concrete sentence: what should I do right now.
-
-Product: {product['display']}
-Version: {from_v} -> {to_v}
-Release notes source: {notes_url}
-
-Release notes:
----
-{notes}
----
-
-{tool_map_block}
-
-{'#'*60}
-""")
+def analyze(token: str, model: str, product: dict, from_version: str,
+            to_version: str, release_notes: str, notes_url: str,
+            tool_map: str | None) -> str:
+    prompt = _build_prompt(product, from_version, to_version,
+                           release_notes, notes_url, tool_map)
+    return _llm_call_with_retry(token, model, prompt)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Analyze Aspose release notes with Claude")
+    parser = argparse.ArgumentParser(
+        description="[ASPOSE LLM] Analyze Aspose release notes via llm.professionalize.com"
+    )
     parser.add_argument("--product", help="Product slug (zip, font, note, pub). Default: all pending.")
     parser.add_argument("--from", dest="from_version", help="Old version (overrides products.json)")
     parser.add_argument("--to",   dest="to_version",   help="New version (overrides products.json)")
-    parser.add_argument("--github-user", default=None,
-                        help="Fallback GitHub username if github_repo not set in products.json")
-    parser.add_argument("--prepare", action="store_true",
-                        help="Only fetch and print context (no Claude API call). Paste output into Claude Code.")
+    parser.add_argument("--model", default=DEFAULT_MODEL,
+                        help=f"Aspose LLM model to use (default: {DEFAULT_MODEL}). "
+                             f"Options: recommended, experimental, qwen3-next, gpt-oss")
     args = parser.parse_args()
+
+    token = os.environ.get("ASPOSE_LLM_TOKEN", "").strip()
+    if not token:
+        print("ERROR: Set the ASPOSE_LLM_TOKEN environment variable.")
+        print("  Get a token at: https://sup.dynabic.com/ (category: Access token request)")
+        print("  Contacts: danil.ivanov@aspose.com, hasan.jamal@aspose.com")
+        return
+
+    print(f"[ASPOSE LLM] Using model: {args.model} @ {ASPOSE_LLM_BASE}")
 
     with open(PRODUCTS_FILE) as f:
         config = json.load(f)
@@ -261,27 +296,26 @@ def main():
         print(f"  Source: {notes_url}")
 
         print("Fetching tool-map.md from GitHub...", flush=True)
-        github_repo = product.get("github_repo") or (
-            f"{args.github_user}/{product['name']}" if args.github_user else None
-        )
+        github_repo = product.get("github_repo")
         tool_map = fetch_tool_map(github_repo) if github_repo else None
         if not github_repo:
-            print("  Skipped (no github_repo in products.json and no --github-user given)")
+            print("  Skipped (no github_repo in products.json)")
         else:
             print(f"  {'Found' if tool_map else f'Not found at {github_repo}'}")
 
-        if args.prepare:
-            _print_context_for_claude(product, from_v, to_v, notes, notes_url, tool_map)
-        else:
-            print("Asking Claude...\n", flush=True)
-            result = analyze(product, from_v, to_v, notes, notes_url, tool_map)
+        print(f"Asking {args.model}...\n", flush=True)
+        try:
+            result = analyze(token, args.model, product, from_v, to_v,
+                             notes, notes_url, tool_map)
             print(result)
+        except RuntimeError as e:
+            print(f"ERROR: {e}")
 
         analyzed_any = True
 
     if not analyzed_any:
         print("\nNothing to analyze. Run check_nuget.py first to detect version changes.")
-        print("Or use: python scripts/analyze_release.py --product zip --from 26.2.0 --to 26.3.0")
+        print("Or use: python scripts/analyze_release_aspose.py --product zip --from 26.3.0 --to 26.4.0")
 
 
 if __name__ == "__main__":

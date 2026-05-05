@@ -10,5 +10,8 @@ Thumbs.db
 ## Claude Code
 .claude/
 
+## Secrets
+.env
+
 ## Local backups
 bkp/
