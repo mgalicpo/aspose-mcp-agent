@@ -4,6 +4,10 @@
 Equivalent to analyze_release.py but uses llm.professionalize.com instead
 of the Anthropic API. Requires ASPOSE_LLM_TOKEN env var.
 
+Uses a ReAct validation loop: after each LLM response, validators check the
+claims against ground truth (NuGet API, release notes text). Failures are fed
+back to the model for revision, up to MAX_REACT_ITERATIONS times.
+
 Gateway docs: see CLAUDE.md
 Models: recommended (default), experimental, qwen3-next, gpt-oss
 
@@ -46,6 +50,7 @@ def _load_env():
 
 _load_env()
 DEFAULT_MODEL = "recommended"
+MAX_REACT_ITERATIONS = 3
 
 
 # ── HTML → plain text ────────────────────────────────────────────────────────
@@ -223,21 +228,156 @@ Release notes (excerpt):
 
 {tool_map_block}
 
-Answer these 4 questions concisely:
+Respond with ONLY valid JSON — no prose, no markdown fences:
+{{
+  "safe_to_merge": true or false,
+  "reason": "one sentence explaining the safe_to_merge decision",
+  "new_tools": [
+    {{"name": "tool_name", "api_class": "ExactCSharpClassName", "description": "one-line description"}}
+  ],
+  "breaking_changes": ["description of each breaking change"],
+  "next_step": "one concrete sentence: what the developer should do right now"
+}}
 
-1. SAFE TO MERGE? Can the Dependabot PR be merged without any MCP server code changes?
-2. NEW TOOLS? List any new Aspose APIs/capabilities that should become new MCP tools (name + one-line description each).
-3. BREAKING CHANGES? Any existing MCP tools affected by API changes or deprecations?
-4. NEXT STEP? One concrete sentence: what should the developer do right now.
+Rules:
+- new_tools: only APIs explicitly listed in the release notes above. "api_class" must be the exact C# class name as written in the release notes.
+- If no new tools, use: "new_tools": []
+- If no breaking changes, use: "breaking_changes": []
 """
 
 
-def analyze(token: str, model: str, product: dict, from_version: str,
-            to_version: str, release_notes: str, notes_url: str,
-            tool_map: str | None) -> str:
-    prompt = _build_prompt(product, from_version, to_version,
-                           release_notes, notes_url, tool_map)
-    return _llm_call_with_retry(token, model, prompt)
+# ── ReAct validators ──────────────────────────────────────────────────────────
+
+def _parse_json_response(raw: str) -> dict:
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    return json.loads(raw.strip())
+
+
+def _validate_schema(decision: dict):
+    """Raise ValueError if required fields are missing or wrong type."""
+    if not isinstance(decision.get("safe_to_merge"), bool):
+        raise ValueError(f"'safe_to_merge' must be bool, got: {decision.get('safe_to_merge')!r}")
+    for field in ("reason", "next_step"):
+        if not isinstance(decision.get(field), str):
+            raise ValueError(f"'{field}' must be a string")
+    if not isinstance(decision.get("new_tools"), list):
+        raise ValueError("'new_tools' must be an array")
+    if not isinstance(decision.get("breaking_changes"), list):
+        raise ValueError("'breaking_changes' must be an array")
+
+
+def _version_exists_on_nuget(nuget: str, version: str) -> bool:
+    """Check that the target version actually exists on NuGet."""
+    url = f"https://api.nuget.org/v3-flatcontainer/{nuget.lower()}/index.json"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            versions = json.loads(r.read())["versions"]
+        return version in versions
+    except Exception:
+        return True  # Don't block analysis on network error
+
+
+def _validate_analysis(decision: dict, to_version: str, nuget: str,
+                        release_notes: str) -> list[str]:
+    """
+    Run ground-truth checks on the LLM's claims.
+    Returns a list of failure messages (empty = all passed).
+    """
+    failures = []
+
+    # Check 1: if safe_to_merge, the target version must exist on NuGet
+    if decision["safe_to_merge"] and not _version_exists_on_nuget(nuget, to_version):
+        failures.append(
+            f"Version {to_version} of {nuget} was not found on NuGet. "
+            f"This version may not exist — reconsider safe_to_merge."
+        )
+
+    # Check 2: each suggested new tool's api_class must appear in the release notes
+    for tool in decision.get("new_tools", []):
+        api_class = (tool.get("api_class") or "").strip()
+        if api_class and api_class not in release_notes:
+            failures.append(
+                f"New tool '{tool.get('name')}' references api_class '{api_class}' "
+                f"but this class name was not found in the release notes text. "
+                f"Only suggest tools for APIs explicitly listed in the release notes."
+            )
+
+    return failures
+
+
+# ── ReAct loop ────────────────────────────────────────────────────────────────
+
+def analyze_with_react(token: str, model: str, product: dict, from_version: str,
+                       to_version: str, release_notes: str, notes_url: str,
+                       tool_map: str | None) -> dict:
+    """
+    ReAct loop: ACT (LLM call) → OBSERVE (validate claims) → feed failures back.
+    Iterates up to MAX_REACT_ITERATIONS times.
+    """
+    base_prompt = _build_prompt(product, from_version, to_version,
+                                release_notes, notes_url, tool_map)
+    current_prompt = base_prompt
+    decision = None
+
+    for iteration in range(MAX_REACT_ITERATIONS):
+        # ACT
+        try:
+            raw = _llm_call_with_retry(token, model, current_prompt)
+            decision = _parse_json_response(raw)
+            _validate_schema(decision)
+        except (json.JSONDecodeError, ValueError) as e:
+            msg = f"Response was not valid JSON: {e}"
+            print(f"  [ReAct {iteration + 1}/{MAX_REACT_ITERATIONS}] {msg}")
+            current_prompt = base_prompt + (
+                f"\n\nOBSERVE: {msg}. Return ONLY valid JSON, no prose."
+            )
+            continue
+
+        # OBSERVE
+        failures = _validate_analysis(decision, to_version, product["nuget"], release_notes)
+
+        if not failures:
+            if iteration > 0:
+                print(f"  [ReAct] Validation passed on iteration {iteration + 1}.")
+            return decision
+
+        failures_text = "\n".join(f"  - {f}" for f in failures)
+        print(f"  [ReAct {iteration + 1}/{MAX_REACT_ITERATIONS}] "
+              f"{len(failures)} validation failure(s), revising...")
+        current_prompt = base_prompt + (
+            f"\n\nOBSERVE — Validation checks found issues with your previous analysis:\n"
+            f"{failures_text}\n\n"
+            f"Revise your analysis based on these findings. Return only valid JSON."
+        )
+
+    print(f"  [ReAct] Returning best-effort result after {MAX_REACT_ITERATIONS} iterations.")
+    return decision
+
+
+# ── Output formatting ─────────────────────────────────────────────────────────
+
+def _print_result(decision: dict):
+    safe = decision.get("safe_to_merge", False)
+    print(f"1. SAFE TO MERGE: {'YES' if safe else 'NO'}")
+    print(f"   {decision.get('reason', '')}")
+
+    new_tools = decision.get("new_tools") or []
+    print(f"\n2. NEW TOOLS: {'None' if not new_tools else ''}")
+    for t in new_tools:
+        print(f"   - {t.get('name')}: {t.get('description', '')}  [API: {t.get('api_class', '?')}]")
+
+    breaking = decision.get("breaking_changes") or []
+    print(f"\n3. BREAKING CHANGES: {'None' if not breaking else ''}")
+    for b in breaking:
+        print(f"   - {b}")
+
+    print(f"\n4. NEXT STEP:")
+    print(f"   {decision.get('next_step', '')}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -303,11 +443,11 @@ def main():
         else:
             print(f"  {'Found' if tool_map else f'Not found at {github_repo}'}")
 
-        print(f"Asking {args.model}...\n", flush=True)
+        print(f"Asking {args.model} (ReAct validation enabled)...\n", flush=True)
         try:
-            result = analyze(token, args.model, product, from_v, to_v,
-                             notes, notes_url, tool_map)
-            print(result)
+            decision = analyze_with_react(token, args.model, product, from_v, to_v,
+                                          notes, notes_url, tool_map)
+            _print_result(decision)
         except RuntimeError as e:
             print(f"ERROR: {e}")
 
