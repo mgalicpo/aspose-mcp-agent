@@ -14,9 +14,13 @@ Usage:
 import argparse
 import json
 import os
+import sys
 import urllib.request
 import urllib.error
 from html.parser import HTMLParser
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
