@@ -172,6 +172,7 @@ python scripts/new_product.py \
 ```
 
 See `docs/new-product-analysis-template.md` for the full analysis guide.
+See `docs/mcp-server-standards.md` for MCP protocol rules, error contract, and the quality checklist.
 
 ## Testing
 
