@@ -13,8 +13,8 @@ import argparse
 import json
 import os
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from html.parser import HTMLParser
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,7 +24,7 @@ DEFAULT_MODEL   = "recommended"
 MAX_REACT_ITERATIONS = 3
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 
 def _load_env():
@@ -211,7 +211,7 @@ def analyze_with_react(token: str, model: str, slug: str, nuget: str,
         # ACT — network errors retried transparently, not fed to LLM
         try:
             raw = _llm_call_with_retry(token, model, current_prompt)
-        except RuntimeError as e:
+        except RuntimeError:
             raise  # network completely unreachable, give up
 
         # Parse JSON — semantic error, feed back as OBSERVE
@@ -250,9 +250,9 @@ def _print_result(result: dict, slug: str, nuget: str):
         print(f"    {t.get('description','')}")
     lims = result.get("limitations") or []
     if lims:
-        print(f"\nLimitations:")
-        for l in lims:
-            print(f"  - {l}")
+        print("\nLimitations:")
+        for lim in lims:
+            print(f"  - {lim}")
     notes = result.get("notes", "")
     if notes:
         print(f"\nNotes: {notes}")
@@ -280,15 +280,15 @@ def _to_tool_map(result: dict, slug: str, nuget: str) -> str:
     lims = result.get("limitations") or []
     if lims:
         lines += ["\n## Limitations\n"]
-        for l in lims:
-            lines.append(f"- {l}")
+        for lim in lims:
+            lines.append(f"- {lim}")
 
     notes = result.get("notes", "")
     if notes:
         lines += ["\n## Implementation Notes\n", notes]
 
     lines += [
-        f"\n## Reference",
+        "\n## Reference",
         f"- Developer Guide: https://docs.aspose.com/{slug}/net/developer-guide/",
         f"- API Reference:   https://reference.aspose.com/{slug}/net/",
         f"- GitHub Examples: https://github.com/aspose-{slug}/Aspose.{slug.capitalize()}-for-.NET",

@@ -1,17 +1,16 @@
 """Tests for scripts/new_product.py — pure function tests, no filesystem/network."""
-import pytest
 from scripts.new_product import (
-    names,
-    t_server_csproj,
-    t_program,
-    t_licensing,
-    t_tools_stub,
-    t_tests_csproj,
-    t_sln,
-    t_gitignore,
-    t_ci,
-    MCP_VERSION,
     HOST_VERSION,
+    MCP_VERSION,
+    names,
+    t_ci,
+    t_gitignore,
+    t_licensing,
+    t_program,
+    t_readme,
+    t_server_csproj,
+    t_sln,
+    t_tools_stub,
 )
 
 
@@ -182,3 +181,99 @@ class TestCi:
 
     def test_targets_dotnet_8(self):
         assert "8.0.x" in self.content
+
+
+class TestScaffold:
+    def test_creates_solution_file(self, tmp_path):
+        from scripts.new_product import scaffold
+        n = names("svg")
+        root = scaffold(n, "Aspose.SVG", "25.1.0", str(tmp_path))
+        assert root is not None
+        import os
+        assert os.path.exists(os.path.join(root, "AsposeSvgMcp.sln"))
+
+    def test_creates_server_csproj(self, tmp_path):
+        from scripts.new_product import scaffold
+        n = names("svg")
+        root = scaffold(n, "Aspose.SVG", "25.1.0", str(tmp_path))
+        import os
+        csproj = os.path.join(root, "src", "SvgMcp.Server", "SvgMcp.Server.csproj")
+        assert os.path.exists(csproj)
+
+    def test_creates_program_cs(self, tmp_path):
+        from scripts.new_product import scaffold
+        n = names("svg")
+        root = scaffold(n, "Aspose.SVG", "25.1.0", str(tmp_path))
+        import os
+        assert os.path.exists(os.path.join(root, "src", "SvgMcp.Server", "Program.cs"))
+
+    def test_creates_gitignore(self, tmp_path):
+        from scripts.new_product import scaffold
+        n = names("svg")
+        root = scaffold(n, "Aspose.SVG", "25.1.0", str(tmp_path))
+        import os
+        assert os.path.exists(os.path.join(root, ".gitignore"))
+
+    def test_creates_ci_workflow(self, tmp_path):
+        from scripts.new_product import scaffold
+        n = names("svg")
+        root = scaffold(n, "Aspose.SVG", "25.1.0", str(tmp_path))
+        import os
+        assert os.path.exists(os.path.join(root, ".github", "workflows", "ci.yml"))
+
+    def test_returns_none_if_dir_exists(self, tmp_path):
+        from scripts.new_product import scaffold
+        n = names("svg")
+        scaffold(n, "Aspose.SVG", "25.1.0", str(tmp_path))
+        result = scaffold(n, "Aspose.SVG", "25.1.0", str(tmp_path))
+        assert result is None
+
+
+class TestReadme:
+    def setup_method(self):
+        self.n = names("svg")
+        self.content = t_readme(self.n, "Aspose.SVG", "25.1.0")
+
+    def test_contains_repo_name(self):
+        assert "aspose-svg-mcp" in self.content
+
+    def test_contains_nuget_name(self):
+        assert "Aspose.SVG" in self.content
+
+    def test_contains_claude_desktop_config(self):
+        assert "claude_desktop_config" in self.content
+
+    def test_contains_claude_code_command(self):
+        assert "claude mcp add" in self.content
+
+    def test_contains_license_reference(self):
+        assert "MIT" in self.content
+
+    def test_contains_server_dir(self):
+        assert "SvgMcp.Server" in self.content
+
+
+class TestDependabot:
+    def test_contains_nuget_ecosystem(self):
+        from scripts.new_product import t_dependabot
+        n = names("svg")
+        content = t_dependabot(n)
+        assert "nuget" in content
+
+    def test_has_weekly_schedule(self):
+        from scripts.new_product import t_dependabot
+        n = names("svg")
+        content = t_dependabot(n)
+        assert "weekly" in content
+
+
+class TestLicense:
+    def setup_method(self):
+        from scripts.new_product import t_license
+        self.content = t_license()
+
+    def test_is_mit(self):
+        assert "MIT License" in self.content
+
+    def test_has_permission_grant(self):
+        assert "Permission is hereby granted" in self.content

@@ -22,18 +22,44 @@ import json
 import os
 import subprocess
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 
 # Windows consoles default to cp1250 which can't handle many Unicode chars
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 from html.parser import HTMLParser
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRODUCTS_FILE = os.path.join(REPO_ROOT, "products.json")
 
 ASPOSE_LLM_BASE = "https://llm.professionalize.com"
+AUDIT_LOG = os.path.join(REPO_ROOT, "audit.jsonl")
+
+
+def _audit_log(product: dict, from_v: str, to_v: str, model: str,
+               decision: dict, iterations: int, escalated: bool):
+    """Append one JSON line per analysis run. Never raises — log failure must not block flow."""
+    from datetime import datetime, timezone
+    entry = {
+        "timestamp":            datetime.now(timezone.utc).isoformat(),
+        "product":              product.get("display"),
+        "nuget":                product.get("nuget"),
+        "from_version":         from_v,
+        "to_version":           to_v,
+        "model":                model,
+        "react_iterations":     iterations,
+        "confidence":           decision.get("confidence"),
+        "safe_to_merge":        decision.get("safe_to_merge"),
+        "new_tools_count":      len(decision.get("new_tools") or []),
+        "breaking_changes":     len(decision.get("breaking_changes") or []),
+        "escalated":            escalated,
+    }
+    try:
+        with open(AUDIT_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
 
 
 def _load_env():
@@ -364,7 +390,7 @@ def analyze_with_react(token: str, model: str, product: dict, from_version: str,
         )
 
     print(f"  [ReAct] Returning best-effort result after {MAX_REACT_ITERATIONS} iterations.")
-    return decision, MAX_REACT_ITERATIONS
+    return decision, MAX_REACT_ITERATIONS  # type: ignore[return-value]
 
 
 def _check_escalation(decision: dict, react_iterations: int) -> list[str]:
@@ -428,20 +454,20 @@ def _create_review_issue(product: dict, from_v: str, to_v: str,
 
     body_lines = [
         f"## Review Required: {product['display']} {from_v} → {to_v}",
-        f"",
-        f"| Field | Value |",
-        f"|---|---|",
+        "",
+        "| Field | Value |",
+        "|---|---|",
         f"| Product | {product['display']} |",
         f"| Version | {from_v} → {to_v} |",
         f"| Safe to merge | {decision.get('safe_to_merge')} |",
         f"| Confidence | {conf_str} |",
-        f"",
-        f"## LLM Analysis",
+        "",
+        "## LLM Analysis",
         f"**Reason:** {decision.get('reason', '')}",
-        f"",
+        "",
         f"**Next step:** {decision.get('next_step', '')}",
-        f"",
-        f"## Escalation Reasons",
+        "",
+        "## Escalation Reasons",
     ]
     for w in warnings:
         body_lines.append(f"- {w}")
@@ -497,7 +523,7 @@ def _print_result(decision: dict, escalation_warnings: list[str]):
     for b in breaking:
         print(f"   - {b}")
 
-    print(f"\n4. NEXT STEP:")
+    print("\n4. NEXT STEP:")
     print(f"   {decision.get('next_step', '')}")
 
     if escalation_warnings:
@@ -582,6 +608,8 @@ def main():
                                                       notes_url, tool_map)
             warnings = _check_escalation(decision, iterations)
             escalated = _print_result(decision, warnings)
+            _audit_log(product, from_v, to_v, args.model,
+                       decision, iterations, escalated)
 
             if escalated and not args.no_hitl:
                 print("  Opening GitHub Issue for human review...", flush=True)

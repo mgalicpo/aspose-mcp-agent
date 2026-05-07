@@ -291,7 +291,7 @@ Thumbs.db
 """
 
 def t_ci(n):
-    return f"""\
+    return """\
 name: CI
 
 on:
@@ -314,7 +314,7 @@ jobs:
 """
 
 def t_dependabot(n):
-    return f"""\
+    return """\
 version: 2
 updates:
   - package-ecosystem: nuget
@@ -429,7 +429,11 @@ def write(path: str, content: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
-    print(f"  created: {os.path.relpath(path)}")
+    try:
+        display = os.path.relpath(path)
+    except ValueError:
+        display = path  # different drive on Windows
+    print(f"  created: {display}")
 
 
 # ── Scaffold ──────────────────────────────────────────────────────────────────
@@ -561,15 +565,15 @@ def main():
 
     register_product(n, args.nuget, args.version, github_repo)
 
-    print(f"\nDone! Next steps:")
-    print(f"  1. Read docs/mcp-server-standards.md       ← MCP protocol rules, error contract, checklist")
-    print(f"  2. Read docs/new-product-analysis-template.md  ← how to analyse Aspose API")
+    print("\nDone! Next steps:")
+    print("  1. Read docs/mcp-server-standards.md       ← MCP protocol rules, error contract, checklist")
+    print("  2. Read docs/new-product-analysis-template.md  ← how to analyse Aspose API")
     print(f"  3. Implement tools in {n['server_dir']}/Tools/{n['cap']}Tools.cs")
-    print(f"  4. Update tool-map.md")
+    print("  4. Update tool-map.md")
     print(f"  5. Write tests in {n['tests_dir']}/")
-    print(f"  6. Run: dotnet build && dotnet test")
+    print("  6. Run: dotnet build && dotnet test")
     if not args.create_repo:
-        print(f"  6. Create GitHub repo and push manually")
+        print("  6. Create GitHub repo and push manually")
         print(f"     gh repo create {n['repo']} --private")
         print(f"     git -C \"{root}\" init -b main && git -C \"{root}\" add -A")
         print(f"     git -C \"{root}\" commit -m 'feat: initial scaffold'")

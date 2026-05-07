@@ -1,11 +1,8 @@
 """Tests for HITL and outcome tracking — pure function tests."""
 import json
-import os
-import tempfile
-import pytest
-from scripts.analyze_release_aspose import _check_escalation, _print_result, CONFIDENCE_THRESHOLD
-from scripts.upgrade_product import _update_product_fields
 
+from scripts.analyze_release_aspose import CONFIDENCE_THRESHOLD, _check_escalation, _print_result
+from scripts.upgrade_product import _update_product_fields, update_csproj
 
 # ── _check_escalation ─────────────────────────────────────────────────────────
 
@@ -133,3 +130,54 @@ class TestUpdateProductFields:
 
         zip_product = next(p for p in config["products"] if p["slug"] == "zip")
         assert zip_product["last_ci_status"] == "PASS"
+
+
+# ── update_csproj ──────────────────────────────────────────────────────────────
+
+class TestUpdateCsproj:
+    CSPROJ = """\
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Aspose.ZIP" Version="26.3.0" />
+    <PackageReference Include="ModelContextProtocol" Version="0.8.0-preview.1" />
+  </ItemGroup>
+</Project>
+"""
+
+    def test_updates_target_package(self, tmp_path):
+        path = str(tmp_path / "test.csproj")
+        with open(path, "w") as f:
+            f.write(self.CSPROJ)
+        result = update_csproj(path, "Aspose.ZIP", "26.3.0", "26.4.0")
+        assert result is True
+        with open(path) as f:
+            content = f.read()
+        assert 'Version="26.4.0"' in content
+        assert 'Version="26.3.0"' not in content
+
+    def test_leaves_other_packages_unchanged(self, tmp_path):
+        path = str(tmp_path / "test.csproj")
+        with open(path, "w") as f:
+            f.write(self.CSPROJ)
+        update_csproj(path, "Aspose.ZIP", "26.3.0", "26.4.0")
+        with open(path) as f:
+            content = f.read()
+        assert 'Version="0.8.0-preview.1"' in content
+
+    def test_returns_false_when_package_not_found(self, tmp_path):
+        path = str(tmp_path / "test.csproj")
+        with open(path, "w") as f:
+            f.write(self.CSPROJ)
+        result = update_csproj(path, "Aspose.Words", "25.1.0", "25.2.0")
+        assert result is False
+
+    def test_updates_regardless_of_old_version(self, tmp_path):
+        # update_csproj matches by package name, not by old version
+        path = str(tmp_path / "test.csproj")
+        with open(path, "w") as f:
+            f.write(self.CSPROJ)
+        result = update_csproj(path, "Aspose.ZIP", "99.0.0", "26.5.0")
+        assert result is True
+        with open(path) as f:
+            content = f.read()
+        assert 'Version="26.5.0"' in content

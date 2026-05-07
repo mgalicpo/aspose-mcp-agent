@@ -1,13 +1,14 @@
 """Tests for analyze_release.py and analyze_release_aspose.py — pure functions."""
 import json
+
 import pytest
-from scripts.analyze_release import _candidate_urls
-from scripts.analyze_release import _html_to_text
+
+from scripts.analyze_release import _candidate_urls, _html_to_text
 from scripts.analyze_release_aspose import (
-    _parse_json_response,
-    _validate_schema,
-    _validate_analysis,
     CONFIDENCE_THRESHOLD,
+    _parse_json_response,
+    _validate_analysis,
+    _validate_schema,
 )
 
 

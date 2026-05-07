@@ -4,9 +4,9 @@ Upgrades Aspose NuGet packages in local MCP server repos, rebuilds, and runs tes
 On success: commits and pushes. On failure: restores the original .csproj.
 
 Usage:
-  python scripts/upgrade_product.py --repos-dir D:\GIT\FinishedMCPservers
-  python scripts/upgrade_product.py --repos-dir D:\GIT\FinishedMCPservers --product zip
-  python scripts/upgrade_product.py --repos-dir D:\GIT\FinishedMCPservers --no-push
+  python scripts/upgrade_product.py --repos-dir D:/GIT/FinishedMCPservers
+  python scripts/upgrade_product.py --repos-dir D:/GIT/FinishedMCPservers --product zip
+  python scripts/upgrade_product.py --repos-dir D:/GIT/FinishedMCPservers --no-push
 """
 import argparse
 import glob
@@ -14,8 +14,6 @@ import json
 import os
 import re
 import subprocess
-import sys
-
 import time
 from datetime import date
 
@@ -118,7 +116,7 @@ def upgrade(product: dict, from_v: str, to_v: str, repos_dir: str, push: bool) -
     print("\n── dotnet build ─────────────────────────────────────────────")
     code, _ = run(["dotnet", "build", "--configuration", "Release", "--nologo"], cwd=repo_dir)
     if code != 0:
-        print(f"\n  BUILD FAILED — restoring .csproj")
+        print("\n  BUILD FAILED — restoring .csproj")
         for path, content in originals.items():
             restore_csproj(path, content)
         return False
@@ -127,12 +125,12 @@ def upgrade(product: dict, from_v: str, to_v: str, repos_dir: str, push: bool) -
     print("\n── dotnet test ──────────────────────────────────────────────")
     code, _ = run(["dotnet", "test", "--no-build", "--configuration", "Release", "--nologo"], cwd=repo_dir)
     if code != 0:
-        print(f"\n  TESTS FAILED — restoring .csproj")
+        print("\n  TESTS FAILED — restoring .csproj")
         for path, content in originals.items():
             restore_csproj(path, content)
         return False
 
-    print(f"\n  Build and tests passed.")
+    print("\n  Build and tests passed.")
 
     # Commit
     for path in bumped:
@@ -151,7 +149,7 @@ def upgrade(product: dict, from_v: str, to_v: str, repos_dir: str, push: bool) -
         if code != 0:
             print("  ERROR: push failed. Commit is local — push manually.")
             return False
-        print(f"  Pushed.")
+        print("  Pushed.")
 
     return True
 
@@ -282,7 +280,7 @@ def main():
 
         if not from_v or not to_v:
             print(f"\n{product['display']}: no version change recorded — skipping.")
-            print(f"  Run check_nuget.py first, or use a different product.")
+            print("  Run check_nuget.py first, or use a different product.")
             continue
 
         if from_v == to_v:

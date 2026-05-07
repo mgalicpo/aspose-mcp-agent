@@ -15,12 +15,12 @@ import argparse
 import json
 import os
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from html.parser import HTMLParser
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -136,7 +136,7 @@ def ask_claude(prompt: str) -> dict:
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}]
     )
-    raw = msg.content[0].text.strip()
+    raw = msg.content[0].text.strip()  # type: ignore[union-attr]
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -154,9 +154,9 @@ def _print_result(result: dict, slug: str):
         print(f"    {t.get('description','')}")
     lims = result.get("limitations") or []
     if lims:
-        print(f"\nLimitations:")
-        for l in lims:
-            print(f"  - {l}")
+        print("\nLimitations:")
+        for lim in lims:
+            print(f"  - {lim}")
     notes = result.get("notes", "")
     if notes:
         print(f"\nNotes: {notes}")
@@ -184,15 +184,15 @@ def _to_tool_map(result: dict, slug: str, nuget: str) -> str:
     lims = result.get("limitations") or []
     if lims:
         lines += ["\n## Limitations\n"]
-        for l in lims:
-            lines.append(f"- {l}")
+        for lim in lims:
+            lines.append(f"- {lim}")
 
     notes = result.get("notes", "")
     if notes:
         lines += ["\n## Implementation Notes\n", notes]
 
     lines += [
-        f"\n## Reference",
+        "\n## Reference",
         f"- Developer Guide: https://docs.aspose.com/{slug}/net/developer-guide/",
         f"- API Reference:   https://reference.aspose.com/{slug}/net/",
         f"- GitHub Examples: https://github.com/aspose-{slug}/Aspose.{slug.capitalize()}-for-.NET",
@@ -234,7 +234,7 @@ def main():
         print(f"{'#'*60}")
         return
 
-    print(f"\nAsking Claude...", flush=True)
+    print("\nAsking Claude...", flush=True)
     try:
         result = ask_claude(prompt)
     except RuntimeError as e:

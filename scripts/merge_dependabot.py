@@ -93,7 +93,7 @@ def ask_claude(prompt: str) -> dict:
         max_tokens=256,
         messages=[{"role": "user", "content": prompt}]
     )
-    raw = msg.content[0].text.strip()
+    raw = msg.content[0].text.strip()  # type: ignore[union-attr]
     # Strip markdown code fences if Claude wraps the JSON
     if raw.startswith("```"):
         raw = raw.split("```")[1]

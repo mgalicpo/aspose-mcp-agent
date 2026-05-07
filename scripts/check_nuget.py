@@ -6,8 +6,8 @@ Also updates products.json with new versions.
 """
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 
 # Always resolve paths relative to repo root, not cwd
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -71,7 +71,7 @@ def main():
             if updates:
                 body = build_issue_body(updates)
                 delimiter = "EOF_ISSUE_BODY"
-                f.write(f"updates_found=true\n")
+                f.write("updates_found=true\n")
                 f.write(f"update_count={len(updates)}\n")
                 f.write(f"issue_body<<{delimiter}\n{body}\n{delimiter}\n")
             else:

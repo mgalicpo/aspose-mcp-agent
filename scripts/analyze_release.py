@@ -11,8 +11,8 @@ Usage:
 import argparse
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 from html.parser import HTMLParser
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -178,7 +178,7 @@ Answer these 4 questions concisely:
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}]
     )
-    return msg.content[0].text
+    return msg.content[0].text  # type: ignore[union-attr]
 
 
 # ── Prepare context for manual Claude Code analysis ──────────────────────────

@@ -12,6 +12,9 @@ Thumbs.db
 
 ## Secrets
 .env
+
+## Runtime logs (gitignored — use audit.jsonl for local debugging only)
+audit.jsonl
 *.db
 *.sqlite
 data/

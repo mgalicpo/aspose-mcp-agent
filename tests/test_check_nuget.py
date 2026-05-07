@@ -1,5 +1,4 @@
 """Tests for scripts/check_nuget.py — pure function tests, no network."""
-import pytest
 from scripts.check_nuget import build_issue_body
 
 

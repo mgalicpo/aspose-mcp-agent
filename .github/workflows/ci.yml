@@ -20,6 +20,15 @@ jobs:
       - name: Install test dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Lint (ruff)
+        run: ruff check scripts/ tests/
+
+      - name: Type check (mypy)
+        run: mypy scripts/ --config-file pyproject.toml
+
+      - name: Security audit (pip-audit)
+        run: pip-audit --desc
+
       - name: Syntax check all scripts
         run: |
           for f in scripts/*.py; do
@@ -38,8 +47,8 @@ jobs:
           python scripts/analyze_new_product.py --help
           python scripts/analyze_new_product_aspose.py --help
 
-      - name: Run tests
-        run: pytest tests/ -v --tb=short
+      - name: Run tests with coverage
+        run: pytest tests/ -v --tb=short --cov=scripts --cov-report=term-missing --cov-config=pyproject.toml
 
       - name: Run NuGet version check (read-only, no auth)
         run: python scripts/check_nuget.py
