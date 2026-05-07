@@ -104,7 +104,7 @@ cp .env.example .env   # fill in ASPOSE_LLM_TOKEN
 python scripts/check_nuget.py                          # detect new versions
 python scripts/analyze_release_aspose.py               # analyze what changed
 python scripts/upgrade_product.py \
-    --repos-dir D:\GIT\FinishedMCPservers               # build, test, push
+    --repos-dir /path/to/repos                         # build, test, push
 
 # ── New product: onboarding ────────────────────────────────────────
 python scripts/analyze_new_product_aspose.py \
@@ -113,8 +113,8 @@ python scripts/analyze_new_product_aspose.py \
 
 python scripts/new_product.py \
     --slug words --nuget "Aspose.Words" --version "25.1.0" \
-    --output-dir D:\GIT\FinishedMCPservers \
-    --github-user mgalicpo --create-repo               # scaffold + push
+    --output-dir /path/to/repos \
+    --github-user <your-org> --create-repo             # scaffold + push
 ```
 
 ## Scripts
@@ -149,10 +149,10 @@ python scripts/new_product.py \
 
 | Product | NuGet | MCP Repo |
 |---|---|---|
-| Aspose.Font | `Aspose.Font` | `mgalicpo/aspose-font-mcp` |
-| Aspose.ZIP  | `Aspose.ZIP`  | `mgalicpo/aspose-zip-mcp`  |
-| Aspose.Note | `Aspose.Note` | `mgalicpo/aspose-note-mcp` |
-| Aspose.PUB  | `Aspose.PUB`  | `mgalicpo/aspose-pub-mcp`  |
+| Aspose.Font | `Aspose.Font` | `aspose/aspose-font-mcp` |
+| Aspose.ZIP  | `Aspose.ZIP`  | `aspose/aspose-zip-mcp`  |
+| Aspose.Note | `Aspose.Note` | `aspose/aspose-note-mcp` |
+| Aspose.PUB  | `Aspose.PUB`  | `aspose/aspose-pub-mcp`  |
 
 ## Adding a New Product
 
@@ -164,8 +164,8 @@ python scripts/analyze_new_product_aspose.py \
 # Step 2 — scaffold project, create GitHub repo, register in products.json
 python scripts/new_product.py \
     --slug words --nuget "Aspose.Words" --version "25.1.0" \
-    --output-dir D:\GIT\FinishedMCPservers \
-    --github-user mgalicpo --create-repo
+    --output-dir /path/to/repos \
+    --github-user <your-org> --create-repo
 
 # Step 3 — implement tools in Claude Code (use tool-map.md as spec)
 # Step 4 — version tracking starts automatically next Monday
@@ -178,16 +178,17 @@ See `docs/mcp-server-standards.md` for MCP protocol rules, error contract, and t
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ -v          # 65 tests, ~2s
+pytest tests/ -v          # 99 tests, ~3s
 ```
 
-Three test modules — all pure unit tests, no network or filesystem:
+Four test modules — all pure unit tests, no network or filesystem:
 
 | Module | Covers |
 |---|---|
 | `tests/test_check_nuget.py` | Issue body formatting, bold versions, no backticks |
 | `tests/test_analyze_release.py` | URL generation, HTML parser, JSON validation, ReAct schema |
-| `tests/test_new_product.py` | Naming conventions, csproj/sln templates, gitignore, CI template |
+| `tests/test_hitl_and_outcomes.py` | Escalation logic, `_print_result`, `_update_product_fields`, csproj patching |
+| `tests/test_new_product.py` | Naming conventions, csproj/sln templates, scaffold, gitignore, CI template |
 
 ## Docker
 
@@ -207,7 +208,7 @@ See `docs/docker.md` for volume behavior, env vars, and healthcheck details.
 bash scripts/run.sh check                            # check NuGet versions
 bash scripts/run.sh analyze                          # analyze releases
 bash scripts/run.sh analyze --product zip            # specific product
-bash scripts/run.sh upgrade --repos-dir D:\GIT\...  # upgrade local repos
+bash scripts/run.sh upgrade --repos-dir /path/to/repos  # upgrade local repos
 bash scripts/run.sh new --slug svg --nuget "Aspose.SVG"  # generate tool map
 bash scripts/run.sh test                             # run pytest
 ```
@@ -215,7 +216,7 @@ bash scripts/run.sh test                             # run pytest
 ## CI
 
 GitHub Actions runs two workflows:
-- **`ci.yml`** — syntax check + --help + **65 pytest tests** (on every push/PR)
+- **`ci.yml`** — ruff lint, mypy type check, pip-audit, **99 pytest tests** (on every push/PR)
 - **`check-versions.yml`** — NuGet version polling (every Monday 08:00 UTC)
 
 See `docs/deployment.md` for manual run order and rollback instructions.
