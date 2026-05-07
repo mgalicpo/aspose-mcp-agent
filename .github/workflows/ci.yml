@@ -17,15 +17,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
       - name: Syntax check all scripts
         run: |
-          python -m py_compile scripts/check_nuget.py
-          python -m py_compile scripts/analyze_release.py
-          python -m py_compile scripts/analyze_release_aspose.py
-          python -m py_compile scripts/merge_dependabot.py
-          python -m py_compile scripts/merge_dependabot_aspose.py
-          python -m py_compile scripts/upgrade_product.py
-          echo "All scripts passed syntax check."
+          for f in scripts/*.py; do
+            python -m py_compile "$f"
+            echo "  OK: $f"
+          done
 
       - name: Verify scripts start up (--help)
         run: |
@@ -34,6 +34,12 @@ jobs:
           python scripts/merge_dependabot.py --help
           python scripts/merge_dependabot_aspose.py --help
           python scripts/upgrade_product.py --help
+          python scripts/new_product.py --help
+          python scripts/analyze_new_product.py --help
+          python scripts/analyze_new_product_aspose.py --help
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
 
       - name: Run NuGet version check (read-only, no auth)
         run: python scripts/check_nuget.py

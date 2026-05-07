@@ -1,0 +1,33 @@
+services:
+  mcp-agent:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./products.json:/app/products.json
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json; json.load(open('products.json')); print('ok')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  check-versions:
+    build: .
+    command: ["python", "scripts/check_nuget.py"]
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./products.json:/app/products.json
+
+  analyze:
+    build: .
+    command: ["python", "scripts/analyze_release_aspose.py"]
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./products.json:/app/products.json
