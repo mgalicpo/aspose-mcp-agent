@@ -16,6 +16,9 @@ import re
 import subprocess
 import sys
 
+import time
+from datetime import date
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRODUCTS_FILE = os.path.join(REPO_ROOT, "products.json")
 
@@ -153,6 +156,99 @@ def upgrade(product: dict, from_v: str, to_v: str, repos_dir: str, push: bool) -
     return True
 
 
+# ── Outcome tracking ─────────────────────────────────────────────────────────
+
+def _update_product_fields(slug: str, fields: dict):
+    """Update specific fields for one product in products.json."""
+    with open(PRODUCTS_FILE) as f:
+        config = json.load(f)
+    for product in config["products"]:
+        if product["slug"] == slug:
+            product.update(fields)
+            break
+    with open(PRODUCTS_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+
+
+def _poll_ci_status(github_repo: str, timeout_seconds: int = 90) -> str:
+    """
+    Poll the most recent GitHub Actions run on main.
+    Returns: PASS | FAIL | TIMEOUT
+    """
+    deadline = time.time() + timeout_seconds
+    attempt = 0
+    while time.time() < deadline:
+        attempt += 1
+        time.sleep(10)
+        try:
+            result = subprocess.run(
+                ["gh", "run", "list", "--repo", github_repo,
+                 "--branch", "main", "--limit", "1",
+                 "--json", "status,conclusion"],
+                capture_output=True, text=True, timeout=15
+            )
+            if result.returncode != 0:
+                continue
+            runs = json.loads(result.stdout)
+            if not runs:
+                continue
+            run = runs[0]
+            status     = run.get("status", "")
+            conclusion = run.get("conclusion", "")
+            if status == "completed":
+                ci = "PASS" if conclusion == "success" else "FAIL"
+                print(f"  CI: {ci} (polled {attempt}x)")
+                return ci
+            print(f"  CI still running ({status})...", flush=True)
+        except Exception as e:
+            print(f"  CI poll error: {e}")
+
+    print(f"  CI status timeout after {timeout_seconds}s — marked TIMEOUT")
+    return "TIMEOUT"
+
+
+def _create_ci_fail_issue(product: dict, to_v: str, github_repo: str):
+    """Open a GitHub Issue in the tracker repo when CI fails after upgrade."""
+    try:
+        tracker_result = subprocess.run(
+            ["git", "-C", REPO_ROOT, "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=5
+        )
+        tracker_url = tracker_result.stdout.strip().rstrip(".git")
+        if "github.com" not in tracker_url:
+            return
+        tracker_repo = tracker_url.split("github.com/")[-1]
+
+        subprocess.run(
+            ["gh", "label", "create", "ci-failed",
+             "--repo", tracker_repo,
+             "--color", "b91c1c",
+             "--description", "CI failed after upgrade",
+             "--force"],
+            capture_output=True
+        )
+        subprocess.run(
+            ["gh", "issue", "create",
+             "--repo", tracker_repo,
+             "--title", f"CI failed: {product['display']} upgrade to {to_v}",
+             "--body", (
+                 f"## CI Failure After Upgrade\n\n"
+                 f"- **Product:** {product['display']}\n"
+                 f"- **Version:** {to_v}\n"
+                 f"- **Repo:** [{github_repo}](https://github.com/{github_repo})\n\n"
+                 f"CI failed after the version bump was pushed. "
+                 f"Check the [Actions tab](https://github.com/{github_repo}/actions) "
+                 f"and investigate before merging.\n\n"
+                 f"_Opened automatically by mcp-agent upgrade_product.py_"
+             ),
+             "--label", "ci-failed"],
+            capture_output=True, text=True, timeout=30
+        )
+        print(f"  CI failure issue opened in {tracker_repo}")
+    except Exception as e:
+        print(f"  Could not create CI failure issue: {e}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -164,6 +260,8 @@ def main():
     parser.add_argument("--product", help="Product slug (zip, font, note, pub). Default: all pending.")
     parser.add_argument("--no-push", action="store_true",
                         help="Skip git push (build and test only)")
+    parser.add_argument("--track-ci", action="store_true",
+                        help="After push, poll GitHub Actions CI and record result in products.json")
     args = parser.parse_args()
 
     with open(PRODUCTS_FILE) as f:
@@ -197,6 +295,25 @@ def main():
 
         ok = upgrade(product, from_v, to_v, args.repos_dir, push=not args.no_push)
         results.append((product["display"], from_v, to_v, ok))
+
+        if ok and not args.no_push:
+            # Record upgrade outcome in products.json
+            _update_product_fields(product["slug"], {
+                "last_upgrade": str(date.today()),
+                "last_upgrade_version": to_v,
+                "last_ci_status": "PENDING",
+            })
+
+            if args.track_ci:
+                github_repo = product.get("github_repo")
+                if github_repo:
+                    print("  Polling CI status...", flush=True)
+                    ci_status = _poll_ci_status(github_repo)
+                    _update_product_fields(product["slug"], {"last_ci_status": ci_status})
+                    if ci_status == "FAIL":
+                        _create_ci_fail_issue(product, to_v, github_repo)
+                else:
+                    print("  Skipping CI tracking (no github_repo in products.json)")
 
     # Summary
     if results:

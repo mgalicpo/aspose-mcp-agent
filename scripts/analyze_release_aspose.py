@@ -20,6 +20,7 @@ Usage:
 import argparse
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 import urllib.error
@@ -386,6 +387,96 @@ def _check_escalation(decision: dict, react_iterations: int) -> list[str]:
     return warnings
 
 
+# ── HITL — GitHub Issue when escalation needed ───────────────────────────────
+
+def _tracker_repo() -> str | None:
+    """Parse 'user/repo' from the mcp-agent git remote origin URL."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", REPO_ROOT, "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=5
+        )
+        url = result.stdout.strip().rstrip(".git")
+        if "github.com" in url:
+            return url.split("github.com/")[-1]
+    except Exception:
+        pass
+    return None
+
+
+def _ensure_label(repo: str, name: str, color: str, description: str):
+    """Create GitHub label if it doesn't exist yet."""
+    subprocess.run(
+        ["gh", "label", "create", name,
+         "--repo", repo, "--color", color,
+         "--description", description, "--force"],
+        capture_output=True
+    )
+
+
+def _create_review_issue(product: dict, from_v: str, to_v: str,
+                          decision: dict, warnings: list[str]) -> str | None:
+    """Open a GitHub Issue in the tracker repo and return its URL."""
+    repo = _tracker_repo()
+    if not repo:
+        return None
+
+    _ensure_label(repo, "needs-review", "e11d48", "Manual review required before merging")
+
+    conf = decision.get("confidence")
+    conf_str = f"{conf:.2f}" if conf is not None else "N/A"
+
+    body_lines = [
+        f"## Review Required: {product['display']} {from_v} → {to_v}",
+        f"",
+        f"| Field | Value |",
+        f"|---|---|",
+        f"| Product | {product['display']} |",
+        f"| Version | {from_v} → {to_v} |",
+        f"| Safe to merge | {decision.get('safe_to_merge')} |",
+        f"| Confidence | {conf_str} |",
+        f"",
+        f"## LLM Analysis",
+        f"**Reason:** {decision.get('reason', '')}",
+        f"",
+        f"**Next step:** {decision.get('next_step', '')}",
+        f"",
+        f"## Escalation Reasons",
+    ]
+    for w in warnings:
+        body_lines.append(f"- {w}")
+
+    new_tools = decision.get("new_tools") or []
+    if new_tools:
+        body_lines += ["", "## New Tools Suggested"]
+        for t in new_tools:
+            body_lines.append(f"- `{t.get('name')}` — {t.get('description', '')}")
+
+    body_lines += [
+        "",
+        "## Action",
+        "Review the release notes and close this issue once you decide whether to proceed.",
+        "",
+        "_Opened automatically by mcp-agent analyze_release_aspose.py_",
+    ]
+
+    title = (f"Review needed: {product['display']} {from_v} → {to_v} "
+             f"[confidence: {conf_str}]")
+
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "create",
+             "--repo", repo,
+             "--title", title,
+             "--body", "\n".join(body_lines),
+             "--label", "needs-review"],
+            capture_output=True, text=True, timeout=30
+        )
+        return result.stdout.strip() if result.returncode == 0 else None
+    except Exception:
+        return None
+
+
 # ── Output formatting ─────────────────────────────────────────────────────────
 
 def _print_result(decision: dict, escalation_warnings: list[str]):
@@ -415,6 +506,8 @@ def _print_result(decision: dict, escalation_warnings: list[str]):
         for w in escalation_warnings:
             print(f"  ! {w}")
         print(f"{'!'*60}")
+        return True  # escalation triggered
+    return False
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -429,6 +522,8 @@ def main():
     parser.add_argument("--model", default=DEFAULT_MODEL,
                         help=f"Aspose LLM model to use (default: {DEFAULT_MODEL}). "
                              f"Options: recommended, experimental, qwen3-next, gpt-oss")
+    parser.add_argument("--no-hitl", action="store_true",
+                        help="Skip GitHub Issue creation on escalation (print warning only)")
     args = parser.parse_args()
 
     token = os.environ.get("ASPOSE_LLM_TOKEN", "").strip()
@@ -486,7 +581,16 @@ def main():
                                                       from_v, to_v, notes,
                                                       notes_url, tool_map)
             warnings = _check_escalation(decision, iterations)
-            _print_result(decision, warnings)
+            escalated = _print_result(decision, warnings)
+
+            if escalated and not args.no_hitl:
+                print("  Opening GitHub Issue for human review...", flush=True)
+                issue_url = _create_review_issue(
+                    product, from_v, to_v, decision, warnings)
+                if issue_url:
+                    print(f"  Issue created: {issue_url}")
+                else:
+                    print("  Could not create issue (gh CLI not available or no remote).")
         except RuntimeError as e:
             print(f"ERROR: {e}")
 
