@@ -173,8 +173,48 @@ python scripts/new_product.py \
 
 See `docs/new-product-analysis-template.md` for the full analysis guide.
 
+## Testing
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v          # 65 tests, ~2s
+```
+
+Three test modules — all pure unit tests, no network or filesystem:
+
+| Module | Covers |
+|---|---|
+| `tests/test_check_nuget.py` | Issue body formatting, bold versions, no backticks |
+| `tests/test_analyze_release.py` | URL generation, HTML parser, JSON validation, ReAct schema |
+| `tests/test_new_product.py` | Naming conventions, csproj/sln templates, gitignore, CI template |
+
+## Docker
+
+```bash
+docker compose build
+
+# Run specific tasks
+docker compose run --rm check-versions   # check NuGet versions
+docker compose run --rm analyze          # analyze pending releases
+```
+
+See `docs/docker.md` for volume behavior, env vars, and healthcheck details.
+
+## One-command runner (local)
+
+```bash
+bash scripts/run.sh check                            # check NuGet versions
+bash scripts/run.sh analyze                          # analyze releases
+bash scripts/run.sh analyze --product zip            # specific product
+bash scripts/run.sh upgrade --repos-dir D:\GIT\...  # upgrade local repos
+bash scripts/run.sh new --slug svg --nuget "Aspose.SVG"  # generate tool map
+bash scripts/run.sh test                             # run pytest
+```
+
 ## CI
 
 GitHub Actions runs two workflows:
-- **`ci.yml`** — syntax checks + script startup tests (on every push/PR)
+- **`ci.yml`** — syntax check + --help + **65 pytest tests** (on every push/PR)
 - **`check-versions.yml`** — NuGet version polling (every Monday 08:00 UTC)
+
+See `docs/deployment.md` for manual run order and rollback instructions.
