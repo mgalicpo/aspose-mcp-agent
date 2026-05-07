@@ -562,11 +562,12 @@ def main():
     register_product(n, args.nuget, args.version, github_repo)
 
     print(f"\nDone! Next steps:")
-    print(f"  1. Read docs/new-product-analysis-template.md")
-    print(f"  2. Analyse {args.nuget} API and fill in {n['server_dir']}/Tools/{n['cap']}Tools.cs")
-    print(f"  3. Update tool-map.md")
-    print(f"  4. Write tests in {n['tests_dir']}/")
-    print(f"  5. Run: dotnet build && dotnet test")
+    print(f"  1. Read docs/mcp-server-standards.md       ← MCP protocol rules, error contract, checklist")
+    print(f"  2. Read docs/new-product-analysis-template.md  ← how to analyse Aspose API")
+    print(f"  3. Implement tools in {n['server_dir']}/Tools/{n['cap']}Tools.cs")
+    print(f"  4. Update tool-map.md")
+    print(f"  5. Write tests in {n['tests_dir']}/")
+    print(f"  6. Run: dotnet build && dotnet test")
     if not args.create_repo:
         print(f"  6. Create GitHub repo and push manually")
         print(f"     gh repo create {n['repo']} --private")
