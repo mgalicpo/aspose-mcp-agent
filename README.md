@@ -171,6 +171,7 @@ python scripts/new_product.py \
 # Step 4 — version tracking starts automatically next Monday
 ```
 
+See `docs/how-it-works.md` for a full walkthrough of every script, git automation, and CI workflows.
 See `docs/new-product-analysis-template.md` for the full analysis guide.
 See `docs/mcp-server-standards.md` for MCP protocol rules, error contract, and the quality checklist.
 
