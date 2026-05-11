@@ -100,7 +100,14 @@ previous_version ≠ current_version   ← PENDING analysis
 
 ### Choose your LLM mode
 
-**Mode 1 — Aspose LLM** (default, recommended for Aspose employees)
+**Mode 1 — Claude Code CLI** �recommended if you don't have an Aspose token
+```bash
+# No API key needed — pipes the prepared prompt directly into Claude Code
+python scripts/analyze_release.py --prepare | claude -p
+python scripts/analyze_new_product.py --slug words --nuget "Aspose.Words" --prepare | claude -p
+```
+
+**Mode 2 — Aspose LLM** (recommended for Aspose employees)
 ```bash
 # .env
 ASPOSE_LLM_TOKEN=your-token
@@ -109,20 +116,13 @@ python scripts/analyze_release_aspose.py
 python scripts/analyze_new_product_aspose.py --slug words --nuget "Aspose.Words" --output tool-map.md
 ```
 
-**Mode 2 — Anthropic API** (if you have an ANTHROPIC_API_KEY)
+**Mode 3 — Anthropic API** (if you have an ANTHROPIC_API_KEY)
 ```bash
 # .env
 ANTHROPIC_API_KEY=your-key
 
 python scripts/analyze_release.py
 python scripts/analyze_new_product.py --slug words --nuget "Aspose.Words" --output tool-map.md
-```
-
-**Mode 3 — Claude Code** (no API key — paste context manually into Claude Code)
-```bash
-python scripts/analyze_release.py --prepare          # prints formatted prompt, no API call
-python scripts/analyze_new_product.py --slug words --nuget "Aspose.Words" --prepare
-# → copy the output and paste it into Claude Code
 ```
 
 ---
@@ -154,18 +154,18 @@ python scripts/new_product.py \
 | Script | Purpose |
 |---|---|
 | `check_nuget.py` | Poll NuGet API, update `products.json`, create GitHub Issue |
-| `analyze_release_aspose.py` | Fetch release notes, ReAct LLM analysis + confidence scoring — **Mode 1** |
-| `analyze_release.py` | Same — **Mode 2** (Anthropic API) or **Mode 3** (`--prepare` → Claude Code) |
-| `merge_dependabot_aspose.py` | Find Dependabot PRs, LLM safe/unsafe decision, optional auto-merge — **Mode 1** |
-| `merge_dependabot.py` | Same — **Mode 2** or **Mode 3** (`--prepare`) |
+| `analyze_release_aspose.py` | Fetch release notes, ReAct LLM analysis + confidence scoring — **Mode 2** |
+| `analyze_release.py` | Same — **Mode 1** (`--prepare \| claude -p`) or **Mode 3** (Anthropic API) |
+| `merge_dependabot_aspose.py` | Find Dependabot PRs, LLM safe/unsafe decision, optional auto-merge — **Mode 2** |
+| `merge_dependabot.py` | Same — **Mode 1** (`--prepare \| claude -p`) or **Mode 3** |
 | `upgrade_product.py` | Bump `.csproj`, `dotnet build`, `dotnet test`, commit, push |
 
 ### New product — onboarding
 
 | Script | Purpose |
 |---|---|
-| `analyze_new_product_aspose.py` | Fetch Aspose docs, generate tool-map.md via Aspose LLM — **Mode 1** |
-| `analyze_new_product.py` | Same — **Mode 2** (Anthropic API) or **Mode 3** (`--prepare` → Claude Code) |
+| `analyze_new_product_aspose.py` | Fetch Aspose docs, generate tool-map.md via Aspose LLM — **Mode 2** |
+| `analyze_new_product.py` | Same — **Mode 1** (`--prepare \| claude -p`) or **Mode 3** (Anthropic API) |
 | `new_product.py` | Scaffold full project structure, create GitHub repo, register in `products.json` |
 
 ## Configuration
