@@ -50,5 +50,3 @@ jobs:
       - name: Run tests with coverage
         run: pytest tests/ -v --tb=short --cov=scripts --cov-report=term-missing --cov-config=pyproject.toml
 
-      - name: Run NuGet version check (read-only, no auth)
-        run: python scripts/check_nuget.py
