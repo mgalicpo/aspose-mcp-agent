@@ -98,32 +98,53 @@ previous_version ≠ current_version   ← PENDING analysis
 
 ## Quick Start
 
-Each LLM script has two variants:
+### Choose your LLM mode
 
-| Variant | Script suffix | How to use |
-|---|---|---|
-| Aspose LLM gateway (default) | `*_aspose.py` | Set `ASPOSE_LLM_TOKEN` in `.env` |
-| Claude API / Claude Code | no suffix | Set `ANTHROPIC_API_KEY` **or** run with `--prepare` to print context and paste into Claude Code manually (no API key needed) |
+**Mode 1 — Aspose LLM** (default, recommended for Aspose employees)
+```bash
+# .env
+ASPOSE_LLM_TOKEN=your-token
+
+python scripts/analyze_release_aspose.py
+python scripts/analyze_new_product_aspose.py --slug words --nuget "Aspose.Words" --output tool-map.md
+```
+
+**Mode 2 — Anthropic API** (if you have an ANTHROPIC_API_KEY)
+```bash
+# .env
+ANTHROPIC_API_KEY=your-key
+
+python scripts/analyze_release.py
+python scripts/analyze_new_product.py --slug words --nuget "Aspose.Words" --output tool-map.md
+```
+
+**Mode 3 — Claude Code** (no API key — paste context manually into Claude Code)
+```bash
+python scripts/analyze_release.py --prepare          # prints formatted prompt, no API call
+python scripts/analyze_new_product.py --slug words --nuget "Aspose.Words" --prepare
+# → copy the output and paste it into Claude Code
+```
+
+---
+
+### Full workflow
 
 ```bash
-# Setup
-cp .env.example .env   # fill in ASPOSE_LLM_TOKEN or ANTHROPIC_API_KEY
-
 # ── Existing product: version update ──────────────────────────────
-python scripts/check_nuget.py                          # detect new versions
-python scripts/analyze_release_aspose.py               # analyze what changed  (or: analyze_release.py)
+python scripts/check_nuget.py                  # detect new versions
+python scripts/analyze_release_aspose.py       # analyze what changed (pick your mode above)
 python scripts/upgrade_product.py \
-    --repos-dir /path/to/repos                         # build, test, push
+    --repos-dir /path/to/repos                 # build, test, push
 
 # ── New product: onboarding ────────────────────────────────────────
 python scripts/analyze_new_product_aspose.py \
     --slug words --nuget "Aspose.Words" \
-    --output tool-map.md                               # generate tool map     (or: analyze_new_product.py)
+    --output tool-map.md                       # generate tool map (pick your mode above)
 
 python scripts/new_product.py \
     --slug words --nuget "Aspose.Words" --version "25.1.0" \
     --output-dir /path/to/repos \
-    --github-user <your-org> --create-repo             # scaffold + push
+    --github-user <your-org> --create-repo     # scaffold + push
 ```
 
 ## Scripts
@@ -133,18 +154,18 @@ python scripts/new_product.py \
 | Script | Purpose |
 |---|---|
 | `check_nuget.py` | Poll NuGet API, update `products.json`, create GitHub Issue |
-| `analyze_release_aspose.py` | Fetch release notes, ReAct LLM analysis + confidence scoring |
-| `analyze_release.py` | Same — Anthropic API, or `--prepare` to print context for Claude Code |
-| `merge_dependabot_aspose.py` | Find Dependabot PRs, LLM safe/unsafe decision, optional auto-merge |
-| `merge_dependabot.py` | Same — Anthropic API, or `--prepare` to print context for Claude Code |
+| `analyze_release_aspose.py` | Fetch release notes, ReAct LLM analysis + confidence scoring — **Mode 1** |
+| `analyze_release.py` | Same — **Mode 2** (Anthropic API) or **Mode 3** (`--prepare` → Claude Code) |
+| `merge_dependabot_aspose.py` | Find Dependabot PRs, LLM safe/unsafe decision, optional auto-merge — **Mode 1** |
+| `merge_dependabot.py` | Same — **Mode 2** or **Mode 3** (`--prepare`) |
 | `upgrade_product.py` | Bump `.csproj`, `dotnet build`, `dotnet test`, commit, push |
 
 ### New product — onboarding
 
 | Script | Purpose |
 |---|---|
-| `analyze_new_product_aspose.py` | Fetch Aspose docs, generate tool-map.md via Aspose LLM (ReAct + network retry) |
-| `analyze_new_product.py` | Same — Anthropic API, or `--prepare` to print context for Claude Code |
+| `analyze_new_product_aspose.py` | Fetch Aspose docs, generate tool-map.md via Aspose LLM — **Mode 1** |
+| `analyze_new_product.py` | Same — **Mode 2** (Anthropic API) or **Mode 3** (`--prepare` → Claude Code) |
 | `new_product.py` | Scaffold full project structure, create GitHub repo, register in `products.json` |
 
 ## Configuration
