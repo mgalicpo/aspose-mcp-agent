@@ -7,6 +7,8 @@ Detects new NuGet releases, analyzes them with an LLM, and upgrades local repos.
 
 ### Existing product — version update flow
 
+> Scripts shown with `_aspose` suffix. Drop the suffix and set `ANTHROPIC_API_KEY` to use Claude API instead.
+
 ```
                         ┌─────────────────────────────────────────────┐
                         │              GitHub Actions (weekly)         │
@@ -96,20 +98,27 @@ previous_version ≠ current_version   ← PENDING analysis
 
 ## Quick Start
 
+Each LLM script has two variants — use whichever token you have:
+
+| Variant | Script suffix | Token required |
+|---|---|---|
+| Aspose LLM gateway (default) | `*_aspose.py` | `ASPOSE_LLM_TOKEN` in `.env` |
+| Anthropic Claude API | no suffix | `ANTHROPIC_API_KEY` in `.env` |
+
 ```bash
 # Setup
-cp .env.example .env   # fill in ASPOSE_LLM_TOKEN
+cp .env.example .env   # fill in ASPOSE_LLM_TOKEN or ANTHROPIC_API_KEY
 
 # ── Existing product: version update ──────────────────────────────
 python scripts/check_nuget.py                          # detect new versions
-python scripts/analyze_release_aspose.py               # analyze what changed
+python scripts/analyze_release_aspose.py               # analyze what changed  (or: analyze_release.py)
 python scripts/upgrade_product.py \
     --repos-dir /path/to/repos                         # build, test, push
 
 # ── New product: onboarding ────────────────────────────────────────
 python scripts/analyze_new_product_aspose.py \
     --slug words --nuget "Aspose.Words" \
-    --output tool-map.md                               # generate tool map
+    --output tool-map.md                               # generate tool map     (or: analyze_new_product.py)
 
 python scripts/new_product.py \
     --slug words --nuget "Aspose.Words" --version "25.1.0" \
@@ -160,6 +169,7 @@ python scripts/new_product.py \
 # Step 1 — generate tool map from Aspose docs
 python scripts/analyze_new_product_aspose.py \
     --slug words --nuget "Aspose.Words" --output tool-map.md
+# alternative: python scripts/analyze_new_product.py ... (uses ANTHROPIC_API_KEY)
 
 # Step 2 — scaffold project, create GitHub repo, register in products.json
 python scripts/new_product.py \
