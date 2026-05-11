@@ -98,12 +98,12 @@ previous_version ≠ current_version   ← PENDING analysis
 
 ## Quick Start
 
-Each LLM script has two variants — use whichever token you have:
+Each LLM script has two variants:
 
-| Variant | Script suffix | Token required |
+| Variant | Script suffix | How to use |
 |---|---|---|
-| Aspose LLM gateway (default) | `*_aspose.py` | `ASPOSE_LLM_TOKEN` in `.env` |
-| Anthropic Claude API | no suffix | `ANTHROPIC_API_KEY` in `.env` |
+| Aspose LLM gateway (default) | `*_aspose.py` | Set `ASPOSE_LLM_TOKEN` in `.env` |
+| Claude API / Claude Code | no suffix | Set `ANTHROPIC_API_KEY` **or** run with `--prepare` to print context and paste into Claude Code manually (no API key needed) |
 
 ```bash
 # Setup
@@ -134,9 +134,9 @@ python scripts/new_product.py \
 |---|---|
 | `check_nuget.py` | Poll NuGet API, update `products.json`, create GitHub Issue |
 | `analyze_release_aspose.py` | Fetch release notes, ReAct LLM analysis + confidence scoring |
-| `analyze_release.py` | Same, using Anthropic API (`--prepare` for no-key mode) |
+| `analyze_release.py` | Same — Anthropic API, or `--prepare` to print context for Claude Code |
 | `merge_dependabot_aspose.py` | Find Dependabot PRs, LLM safe/unsafe decision, optional auto-merge |
-| `merge_dependabot.py` | Same, using Anthropic API |
+| `merge_dependabot.py` | Same — Anthropic API, or `--prepare` to print context for Claude Code |
 | `upgrade_product.py` | Bump `.csproj`, `dotnet build`, `dotnet test`, commit, push |
 
 ### New product — onboarding
@@ -144,7 +144,7 @@ python scripts/new_product.py \
 | Script | Purpose |
 |---|---|
 | `analyze_new_product_aspose.py` | Fetch Aspose docs, generate tool-map.md via Aspose LLM (ReAct + network retry) |
-| `analyze_new_product.py` | Same, using Anthropic API (`--prepare` for no-key mode) |
+| `analyze_new_product.py` | Same — Anthropic API, or `--prepare` to print context for Claude Code |
 | `new_product.py` | Scaffold full project structure, create GitHub repo, register in `products.json` |
 
 ## Configuration
