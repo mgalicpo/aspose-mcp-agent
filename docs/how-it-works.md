@@ -4,6 +4,22 @@ End-to-end guide: what every script does, how they chain together, and where git
 
 ---
 
+## LLM Modes
+
+Every analysis step (release analysis, Dependabot review, new product design) can run in three modes. Choose based on what you have available:
+
+| Mode | How to invoke | Requires |
+|---|---|---|
+| **1 — Claude Code CLI** | `python script.py --prepare \| claude -p` | Claude Code installed |
+| **2 — Aspose LLM** | `python script_aspose.py` | `ASPOSE_LLM_TOKEN` in `.env` |
+| **3 — Anthropic API** | `python script.py` (no flag) | `ANTHROPIC_API_KEY` in `.env` |
+
+**Mode 1 is the recommended default** for anyone without an Aspose token. The `--prepare` flag fetches all context (release notes, tool-map.md, PR list) and formats it as a ready-to-use prompt. Piping to `claude -p` runs it non-interactively — no copy-paste, no API key.
+
+Mode 2 (`*_aspose.py` scripts) is preferred for Aspose employees as it uses the internal LLM gateway and runs fully automated.
+
+---
+
 ## Central State: `products.json`
 
 Every script reads and writes a single file — `products.json`. It tracks per-product state:
@@ -85,7 +101,23 @@ Polls the NuGet v3 API for the latest version of each package. If a new version 
 
 The `[skip ci]` suffix prevents the push from triggering another CI run.
 
-### Step 2 — `analyze_release_aspose.py`
+### Step 2 — release analysis (pick your mode)
+
+```bash
+# Mode 1 — Claude Code CLI (recommended, no token needed)
+python scripts/analyze_release.py --prepare | claude -p
+
+# Mode 2 — Aspose LLM
+python scripts/analyze_release_aspose.py
+
+# Mode 3 — Anthropic API
+python scripts/analyze_release.py
+```
+
+All three run the same logic. `analyze_release_aspose.py` runs it fully automated;
+`analyze_release.py --prepare` fetches the context and pipes it to Claude Code.
+
+**What happens internally:**
 
 Fetches the Aspose release notes page and runs a ReAct analysis loop:
 
@@ -160,14 +192,18 @@ Updates `last_ci_status` in `products.json` with the result.
 
 ## Workflow 2: Dependabot PR Merge
 
-```
-merge_dependabot_aspose.py
-    → lists open Dependabot PRs via gh pr list
-    → asks LLM: safe to merge?
-    → (optionally) merges with gh pr merge --squash
+```bash
+# Mode 1 — Claude Code CLI
+python scripts/merge_dependabot.py --prepare | claude -p
+
+# Mode 2 — Aspose LLM
+python scripts/merge_dependabot_aspose.py
+
+# Mode 3 — Anthropic API
+python scripts/merge_dependabot.py
 ```
 
-`gh pr list --repo <github_repo> --author app/dependabot --json number,title,headRefName`
+Lists open Dependabot PRs (`gh pr list --repo <github_repo> --author app/dependabot`), asks the LLM whether each is safe to merge, and optionally merges with `gh pr merge --squash`.
 
 Decision is made per PR. Merges only if LLM returns `safe_to_merge: true` and user confirms (or `--auto` flag is set).
 
@@ -189,7 +225,18 @@ new_product.py
     → registers product in products.json
 ```
 
-### Step 1 — `analyze_new_product_aspose.py`
+### Step 1 — tool map generation (pick your mode)
+
+```bash
+# Mode 1 — Claude Code CLI
+python scripts/analyze_new_product.py --slug words --nuget "Aspose.Words" --prepare | claude -p
+
+# Mode 2 — Aspose LLM
+python scripts/analyze_new_product_aspose.py --slug words --nuget "Aspose.Words" --output tool-map.md
+
+# Mode 3 — Anthropic API
+python scripts/analyze_new_product.py --slug words --nuget "Aspose.Words" --output tool-map.md
+```
 
 Fetches Aspose product documentation and uses the LLM to design a `tool-map.md` — a structured mapping of Aspose API sections to MCP tool names, parameters, and return types. Writes the file to disk.
 
@@ -270,7 +317,8 @@ Useful for reviewing history of decisions without touching GitHub.
 
 | Variable | Used by | Purpose |
 |---|---|---|
-| `ASPOSE_LLM_TOKEN` | `*_aspose.py` scripts | Bearer token for `llm.professionalize.com` |
-| `ANTHROPIC_API_KEY` | `analyze_release.py`, `analyze_new_product.py`, `merge_dependabot.py` | Anthropic API (alternative scripts) |
+| *(none)* | Mode 1 — `--prepare \| claude -p` | Claude Code CLI; no env var needed |
+| `ASPOSE_LLM_TOKEN` | Mode 2 — `*_aspose.py` scripts | Bearer token for `llm.professionalize.com` |
+| `ANTHROPIC_API_KEY` | Mode 3 — non-aspose scripts without `--prepare` | Anthropic API direct access |
 | `GH_TOKEN` / `GITHUB_TOKEN` | GitHub Actions | `gh` CLI authentication |
 | `ASPOSE_LICENSE_PATH` | MCP server processes | Path to `.lic` file; omit for evaluation mode |
