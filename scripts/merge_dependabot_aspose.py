@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -154,13 +155,21 @@ def ask_aspose_llm(token: str, model: str, prompt: str, max_attempts: int = 3) -
             if "reason" not in decision or "action" not in decision:
                 raise ValueError(f"Missing required keys. Got: {list(decision.keys())}")
             return decision
-        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+        except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500:
+                raise RuntimeError(
+                    f"[ASPOSE LLM] Client error {e.code} — check token and parameters"
+                ) from e
+            last_error = f"HTTP error: {e}"
+        except urllib.error.URLError as e:
             last_error = f"HTTP error: {e}"
         except (json.JSONDecodeError, ValueError) as e:
             last_error = f"Invalid response: {e}"
         except Exception as e:
             last_error = str(e)
-        print(f"  [retry {attempt + 1}/{max_attempts}] {last_error}")
+        print(f"  [retry {attempt + 1}/{max_attempts}] {last_error}", flush=True)
+        if attempt < max_attempts - 1:
+            time.sleep(2 ** attempt)  # 1s, 2s
 
     raise RuntimeError(f"[ASPOSE LLM] Failed after {max_attempts} attempts: {last_error}")
 

@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from html.parser import HTMLParser
@@ -168,12 +169,19 @@ def _llm_call_with_retry(token: str, model: str, prompt: str,
     for attempt in range(max_attempts):
         try:
             return _llm_call(token, model, prompt)
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as e:
+        except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500:
+                raise RuntimeError(
+                    f"[ASPOSE LLM] Client error {e.code} — check token and parameters"
+                ) from e
             last_error = str(e)
-            print(f"  [network retry {attempt+1}/{max_attempts}] {last_error}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_error = str(e)
         except Exception as e:
             last_error = str(e)
-            print(f"  [network retry {attempt+1}/{max_attempts}] {last_error}")
+        print(f"  [network retry {attempt+1}/{max_attempts}] {last_error}", flush=True)
+        if attempt < max_attempts - 1:
+            time.sleep(2 ** attempt)  # 1s, 2s
     raise RuntimeError(f"LLM unreachable after {max_attempts} attempts: {last_error}")
 
 

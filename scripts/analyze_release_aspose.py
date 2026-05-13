@@ -22,6 +22,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -223,10 +224,16 @@ def _llm_call_with_retry(token: str, model: str, prompt: str,
         try:
             return _llm_call(token, model, user_prompt)
         except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500:
+                raise RuntimeError(
+                    f"[ASPOSE LLM] Client error {e.code} — check token and parameters"
+                ) from e
             last_error = f"HTTP {e.code}: {e.reason}"
         except Exception as e:
             last_error = str(e)
-        print(f"  [retry {attempt + 1}/{max_attempts}] Error: {last_error}")
+        print(f"  [retry {attempt + 1}/{max_attempts}] Error: {last_error}", flush=True)
+        if attempt < max_attempts - 1:
+            time.sleep(2 ** attempt)  # 1s, 2s
 
     raise RuntimeError(
         f"[ASPOSE LLM] Failed after {max_attempts} attempts. Last error: {last_error}"
