@@ -566,8 +566,8 @@ def main():
     register_product(n, args.nuget, args.version, github_repo)
 
     print("\nDone! Next steps:")
-    print("  1. Read docs/mcp-server-standards.md       ← MCP protocol rules, error contract, checklist")
-    print("  2. Read docs/new-product-analysis-template.md  ← how to analyse Aspose API")
+    print("  1. Read docs/mcp-server-standards.md       (MCP protocol rules, error contract, checklist)")
+    print("  2. Read docs/new-product-analysis-template.md  (how to analyse Aspose API)")
     print(f"  3. Implement tools in {n['server_dir']}/Tools/{n['cap']}Tools.cs")
     print("  4. Update tool-map.md")
     print(f"  5. Write tests in {n['tests_dir']}/")
