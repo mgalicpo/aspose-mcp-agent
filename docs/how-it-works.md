@@ -119,13 +119,21 @@ All three run the same logic. `analyze_release_aspose.py` runs it fully automate
 
 **What happens internally:**
 
-Fetches the Aspose release notes page and runs a ReAct analysis loop:
+Fetches the Aspose release notes page (truncated to 5000 chars before sending to LLM) and runs a ReAct analysis loop:
 
 **ReAct loop (ACT → OBSERVE → re-prompt, up to 3 iterations):**
 
 1. **ACT** — sends release notes + tool-map.md to the LLM, asks for structured JSON decision
 2. **OBSERVE** — validates the JSON schema, checks that any claimed `api_class` names actually appear in the release notes text
 3. If validation fails, feeds the failure reason back to the LLM and tries again
+
+**HTTP retry behaviour (applies to all `*_aspose.py` scripts):**
+
+| Error type | Behaviour |
+|---|---|
+| 4xx (incl. 401 Unauthorized) | Fail immediately — client error, retrying won't help |
+| 5xx / network error | Retry up to 3 times with exponential backoff (1s, 2s) |
+| Invalid JSON / schema error | Retry up to 3 times, feeding the error back to the model |
 
 **Output decision schema:**
 ```json
