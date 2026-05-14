@@ -252,3 +252,13 @@ GitHub Actions runs two workflows:
 - **`check-versions.yml`** — NuGet version polling (every Monday 08:00 UTC)
 
 See `docs/deployment.md` for manual run order and rollback instructions.
+
+## Migrating to Aspose GitHub
+
+When moving this repo to an Aspose GitHub organization, update these in order:
+
+1. **`products.json`** — change `github_repo` fields from `mgalicpo/aspose-*-mcp` to the new org (e.g. `aspose/aspose-*-mcp`)
+2. **`CODEOWNERS`** — replace `@mgalicpo` with the Aspose team or owner
+3. **`SECURITY.md`** — replace the contact email with an Aspose security address
+4. **GitHub Actions secrets** — add `ASPOSE_LLM_TOKEN` as a repository secret for the `check-versions.yml` workflow
+5. **Local `.env`** — update `ASPOSE_LLM_TOKEN` (same value, just re-add after re-clone)
