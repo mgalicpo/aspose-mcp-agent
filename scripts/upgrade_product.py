@@ -113,7 +113,7 @@ def upgrade(product: dict, from_v: str, to_v: str, repos_dir: str, push: bool) -
         return False
 
     # Build
-    print("\n── dotnet build ─────────────────────────────────────────────")
+    print("\n-- dotnet build ---------------------------------------------")
     code, _ = run(["dotnet", "build", "--configuration", "Release", "--nologo"], cwd=repo_dir)
     if code != 0:
         print("\n  BUILD FAILED — restoring .csproj")
@@ -122,7 +122,7 @@ def upgrade(product: dict, from_v: str, to_v: str, repos_dir: str, push: bool) -
         return False
 
     # Test
-    print("\n── dotnet test ──────────────────────────────────────────────")
+    print("\n-- dotnet test ----------------------------------------------")
     code, _ = run(["dotnet", "test", "--no-build", "--configuration", "Release", "--nologo"], cwd=repo_dir)
     if code != 0:
         print("\n  TESTS FAILED — restoring .csproj")
