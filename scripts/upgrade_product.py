@@ -297,6 +297,7 @@ def main():
         if ok and not args.no_push:
             # Record upgrade outcome in products.json
             _update_product_fields(product["slug"], {
+                "previous_version": to_v,
                 "last_upgrade": str(date.today()),
                 "last_upgrade_version": to_v,
                 "last_ci_status": "PENDING",
