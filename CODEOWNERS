@@ -1,1 +1,33 @@
-* @mgalicpo
+# CODEOWNERS — automatic reviewer assignment for pull requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+*                                        @mgalicpo
+
+# Core agent scripts — critical path
+/scripts/analyze_release_aspose.py       @mgalicpo
+/scripts/analyze_release.py              @mgalicpo
+/scripts/check_nuget.py                  @mgalicpo
+/scripts/upgrade_product.py              @mgalicpo
+/scripts/merge_dependabot_aspose.py      @mgalicpo
+/scripts/merge_dependabot.py             @mgalicpo
+/scripts/new_product.py                  @mgalicpo
+/scripts/analyze_new_product_aspose.py   @mgalicpo
+/scripts/analyze_new_product.py          @mgalicpo
+
+# State and configuration
+/products.json                           @mgalicpo
+/pyproject.toml                          @mgalicpo
+
+# CI and infrastructure
+/.github/                                @mgalicpo
+/Dockerfile                              @mgalicpo
+/docker-compose.yml                      @mgalicpo
+
+# Documentation and governance
+/AGENTS.md                               @mgalicpo
+/SECURITY.md                             @mgalicpo
+/CHANGELOG.md                            @mgalicpo
+/README.md                               @mgalicpo
+/CLAUDE.md                               @mgalicpo
+/docs/                                   @mgalicpo
