@@ -30,8 +30,8 @@ HOST_VERSION = "10.0.3"
 
 def names(slug: str):
     """Return all naming variants derived from the slug."""
-    cap    = slug.capitalize()           # words → Words
-    prefix = f"{cap}Mcp"                # WordsMcp
+    cap    = "".join(w.capitalize() for w in slug.split("-"))  # drawing-claude → DrawingClaude
+    prefix = f"{cap}Mcp"                # DrawingClaudeMcp
     return {
         "slug":       slug,             # words
         "cap":        cap,              # Words
