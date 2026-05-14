@@ -162,7 +162,11 @@ Return ONLY a JSON object in this exact format:
 - Wrap all Aspose calls in try/catch — return Error on any exception
 - Use {nuget} API classes exactly as named in the tool-map api_class column
 - No TODO comments — every tool must be fully implemented
-- File must compile without errors against .NET 8 and {nuget}{error_block}"""
+- File must compile without errors against .NET 8 and {nuget}
+- CRITICAL: [Description("...")] attributes must contain only plain text — never put double quotes, curly braces, or JSON inside Description strings. Use single quotes or rephrase instead.
+- CRITICAL: Return ONLY the raw JSON object — do not wrap it in markdown code fences
+- CRITICAL: Optional parameters (with default values) must come AFTER all required parameters in every method signature
+- ASPOSE.DRAWING NAMESPACES: This package is a System.Drawing replacement. Drawing classes (Bitmap, Graphics, Pen, Brush, etc.) are in System.Drawing and System.Drawing.Drawing2D — NOT in Aspose.Drawing. Only the License class is in Aspose.Drawing namespace. Do NOT add 'using Aspose.Drawing.Drawing2D;' — use 'using System.Drawing.Drawing2D;' instead.{error_block}"""
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
