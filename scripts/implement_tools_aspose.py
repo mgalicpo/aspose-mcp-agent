@@ -46,7 +46,7 @@ def _llm_call(token: str, model: str, prompt: str) -> str:
     payload = json.dumps({
         "model":      model,
         "messages":   [{"role": "user", "content": prompt}],
-        "max_tokens": 4096,
+        "max_tokens": 8192,
     }).encode()
     req = urllib.request.Request(
         url, data=payload,
@@ -92,10 +92,14 @@ def _extract_code(raw: str) -> str:
             return data["tools_file"]
     except Exception:
         pass
-    # Try fenced code block
+    # Try fenced code block (with closing fence)
     m = re.search(r"```(?:csharp|cs)?\s*([\s\S]+?)```", raw)
     if m:
         return m.group(1).strip()
+    # Truncated response — strip opening fence line if present
+    lines = raw.splitlines()
+    if lines and lines[0].startswith("```"):
+        return "\n".join(lines[1:]).strip()
     return raw
 
 
@@ -139,8 +143,11 @@ def _build_prompt(tool_map: str, scaffold: str, csproj: str,
 
 ## Task
 Implement all MCP tools listed in the tool-map below.
-Return ONLY a JSON object in this exact format:
-{{"tools_file": "<complete compilable C# file content>"}}
+Return ONLY the complete C# file content wrapped in a single code block:
+```csharp
+// your implementation here
+```
+No explanations, no other text — just the code block.
 
 ## Tool Map
 {tool_map}
@@ -164,7 +171,7 @@ Return ONLY a JSON object in this exact format:
 - No TODO comments — every tool must be fully implemented
 - File must compile without errors against .NET 8 and {nuget}
 - CRITICAL: [Description("...")] attributes must contain only plain text — never put double quotes, curly braces, or JSON inside Description strings. Use single quotes or rephrase instead.
-- CRITICAL: Return ONLY the raw JSON object — do not wrap it in markdown code fences
+- CRITICAL: Return ONLY the code block — no JSON wrapper, no extra text
 - CRITICAL: Optional parameters (with default values) must come AFTER all required parameters in every method signature
 - ASPOSE.DRAWING NAMESPACES: This package is a System.Drawing replacement. Drawing classes (Bitmap, Graphics, Pen, Brush, etc.) are in System.Drawing and System.Drawing.Drawing2D — NOT in Aspose.Drawing. Only the License class is in Aspose.Drawing namespace. Do NOT add 'using Aspose.Drawing.Drawing2D;' — use 'using System.Drawing.Drawing2D;' instead.{error_block}"""
 
