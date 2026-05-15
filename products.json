@@ -45,14 +45,6 @@
       "slug": "drawing",
       "current_version": "26.5.0",
       "github_repo": "mgalicpo/aspose-drawing-mcp"
-    },
-    {
-      "name": "aspose-drawing-claude-mcp",
-      "display": "Aspose.Drawing (Claude)",
-      "nuget": "Aspose.Drawing",
-      "slug": "drawing-claude",
-      "current_version": "26.5.0",
-      "github_repo": "mgalicpo/aspose-drawing-claude-mcp"
     }
   ]
 }
