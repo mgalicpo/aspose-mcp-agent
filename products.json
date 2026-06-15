@@ -43,8 +43,9 @@
       "display": "Aspose.Drawing",
       "nuget": "Aspose.Drawing",
       "slug": "drawing",
-      "current_version": "26.5.0",
-      "github_repo": "mgalicpo/aspose-drawing-mcp"
+      "current_version": "26.6.0",
+      "github_repo": "mgalicpo/aspose-drawing-mcp",
+      "previous_version": "26.5.0"
     }
   ]
 }
