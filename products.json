@@ -18,8 +18,8 @@
       "nuget": "Aspose.ZIP",
       "slug": "zip",
       "github_repo": "mgalicpo/aspose-zip-mcp",
-      "current_version": "26.6.0",
-      "previous_version": "26.5.0"
+      "current_version": "26.7.0",
+      "previous_version": "26.6.0"
     },
     {
       "name": "aspose-note-mcp",
@@ -27,8 +27,8 @@
       "nuget": "Aspose.Note",
       "slug": "note",
       "github_repo": "mgalicpo/aspose-note-mcp",
-      "current_version": "26.7.0",
-      "previous_version": "26.4.0"
+      "current_version": "26.7.2",
+      "previous_version": "26.7.0"
     },
     {
       "name": "aspose-pub-mcp",
@@ -43,9 +43,9 @@
       "display": "Aspose.Drawing",
       "nuget": "Aspose.Drawing",
       "slug": "drawing",
-      "current_version": "26.6.0",
+      "current_version": "26.7.0",
       "github_repo": "mgalicpo/aspose-drawing-mcp",
-      "previous_version": "26.5.0"
+      "previous_version": "26.6.0"
     }
   ]
 }
