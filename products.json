@@ -6,8 +6,8 @@
       "nuget": "Aspose.Font",
       "slug": "font",
       "github_repo": "mgalicpo/aspose-font-mcp",
-      "current_version": "26.6.0",
-      "previous_version": "26.4.0",
+      "current_version": "26.8.0",
+      "previous_version": "26.6.0",
       "last_upgrade": "2026-05-14",
       "last_upgrade_version": "26.4.0",
       "last_ci_status": "PENDING"
@@ -27,8 +27,8 @@
       "nuget": "Aspose.Note",
       "slug": "note",
       "github_repo": "mgalicpo/aspose-note-mcp",
-      "current_version": "26.7.3",
-      "previous_version": "26.7.2"
+      "current_version": "26.8.1",
+      "previous_version": "26.7.3"
     },
     {
       "name": "aspose-pub-mcp",
@@ -36,7 +36,8 @@
       "nuget": "Aspose.PUB",
       "slug": "pub",
       "github_repo": "mgalicpo/aspose-pub-mcp",
-      "current_version": "25.12.0"
+      "current_version": "26.8.0",
+      "previous_version": "25.12.0"
     },
     {
       "name": "aspose-drawing-mcp",
